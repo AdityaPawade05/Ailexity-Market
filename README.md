@@ -1,6 +1,6 @@
 # Ailexity Market
 
-A digital marketplace for ebooks and courses, similar to Whop. Buy and sell digital content with a full admin panel.
+A full-stack digital platform combining e-commerce and social networking. Built with Next.js and React, it enables creators to sell digital products (ebooks, courses), engage audiences, and grow through channels—with secure payments and role-based access (admin, seller, buyer).
 
 ## Features
 
