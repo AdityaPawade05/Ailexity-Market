@@ -1,0 +1,50 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+
+export async function GET(request: Request) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { searchParams } = new URL(request.url);
+  const productId = searchParams.get("productId");
+
+  const where: any = { sellerId: session.userId };
+  if (productId) where.productId = productId;
+
+  const invoices = await prisma.invoice.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    include: { product: { select: { title: true } } },
+  });
+
+  return NextResponse.json(invoices);
+}
+
+export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  try {
+    const body = await request.json();
+    const { amount, customerName, customerEmail, description, dueDate, productId } = body;
+
+    const invoice = await prisma.invoice.create({
+      data: {
+        amount: parseFloat(amount),
+        customerName,
+        customerEmail,
+        description,
+        dueDate: new Date(dueDate),
+        status: "pending",
+        sellerId: session.userId,
+        productId: productId || null,
+      },
+    });
+
+    return NextResponse.json(invoice);
+  } catch (error) {
+    console.error("Invoice creation error:", error);
+    return NextResponse.json({ error: "Failed to create invoice" }, { status: 500 });
+  }
+}

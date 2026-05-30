@@ -23,16 +23,8 @@ A full-stack digital platform combining e-commerce and social networking. Built 
 
    Copy `.env.example` to `.env` and set:
 
-   - `DATABASE_URL` - MongoDB connection string (MongoDB Atlas recommended for easy setup)
+   - `DATABASE_URL` - SQLite path (default `file:./dev.db` works for local dev)
    - `JWT_SECRET` - Change in production!
-
-   **MongoDB Atlas Setup (Recommended):**
-   1. Go to [MongoDB Atlas](https://www.mongodb.com/atlas) and create a free account
-   2. Create a new cluster (M0 free tier)
-   3. In Network Access, add IP `0.0.0.0/0` for development
-   4. In Database Access, create a user with read/write permissions
-   5. Get your connection string from "Connect" > "Connect your application"
-   6. Update `DATABASE_URL` in `.env` with your Atlas connection string
 
 3. **Initialize database**
 
