@@ -29,6 +29,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
 
 # env files (can opt-in for committing if needed)
 .env*
@@ -45,8 +46,8 @@ prisma/*.db
 *.tsbuildinfo
 next-env.d.ts
 
-# local debug / scratch scripts
-debug_*.js
-debug_*.mjs
-scratch_*.js
-models2.json
+# uploaded files (stored locally, not committed to git)
+/public/uploads/
+
+# local tool settings (machine-specific, not shared)
+.claude/settings.local.json

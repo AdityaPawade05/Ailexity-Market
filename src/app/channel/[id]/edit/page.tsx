@@ -115,7 +115,7 @@ export default function EditChannelPage() {
     setSubmitting(true);
 
     try {
-      const payload: Record<string, any> = {};
+      const payload: Record<string, string | number | null> = {};
 
       // Only include fields that were actually modified
       if (name.trim() !== channel?.name) {
@@ -174,7 +174,6 @@ export default function EditChannelPage() {
       }
 
       const data = await res.json();
-      console.log("Update successful:", data);
       setSuccess("Community updated successfully!");
       setChannel(data);
       setTimeout(() => {

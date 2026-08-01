@@ -89,34 +89,46 @@ export default function LibraryViewerPage() {
             </div>
           </div>
 
-          <div className="relative aspect-[16/10] w-full overflow-hidden rounded-2xl bg-zinc-100 border border-zinc-200 shadow-sm flex items-center justify-center">
+          <div className="w-full overflow-hidden rounded-2xl border border-zinc-200 shadow-sm bg-zinc-100">
             {product.fileUrl ? (
-              product.fileUrl.endsWith(".pdf") ? (
-                <iframe 
-                  src={`${product.fileUrl}#toolbar=0`} 
-                  className="w-full h-full min-h-[600px] border-none"
-                  title={product.title}
-                />
-              ) : (
-                <div className="text-center p-8">
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-amber-600">
-                    <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
+              (() => {
+                const url = product.fileUrl;
+                const isPdf =
+                  url.startsWith("data:application/pdf") ||
+                  url.split("?")[0].toLowerCase().endsWith(".pdf");
+                if (isPdf) {
+                  return (
+                    <iframe
+                      src={url}
+                      className="w-full border-none"
+                      style={{ height: "80vh", minHeight: 500 }}
+                      title={product.title}
+                    />
+                  );
+                }
+                return (
+                  <div className="flex flex-col items-center justify-center p-12 text-center gap-4">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                      <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    <h3 className="font-semibold text-zinc-900">Content File Ready</h3>
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block rounded-lg bg-amber-500 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-amber-600"
+                    >
+                      Open / Download File
+                    </a>
                   </div>
-                  <h3 className="font-semibold text-zinc-900 mb-2">Content File Ready</h3>
-                  <a 
-                    href={product.fileUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="inline-block rounded-lg bg-amber-500 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-amber-600"
-                  >
-                    Open Full Document
-                  </a>
-                </div>
-              )
+                );
+              })()
             ) : (
-              <p className="text-zinc-500">No content file has been provided for this product.</p>
+              <div className="flex items-center justify-center py-20 text-zinc-500">
+                No content file has been provided for this product.
+              </div>
             )}
           </div>
         </div>

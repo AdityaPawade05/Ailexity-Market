@@ -1,10 +1,34 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense, FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+
+type BusinessProfile = {
+  id?: string;
+  name?: string | null;
+  bio?: string | null;
+  avatar?: string | null;
+  coverImageUrl?: string | null;
+  socialLinks?: string | null;
+  location?: string | null;
+};
+
+type TeamPerson = { id: string; name: string; email: string; avatar: string | null };
+type TeamMemberRow = { id: string; role: string; createdAt: string; user: TeamPerson };
+type TeamInviteRow = { id: string; email: string | null; token: string; status: string; createdAt: string };
+type TeamData = { owner: TeamPerson | null; members: TeamMemberRow[]; invites: TeamInviteRow[] };
+
+type ActivityItem = {
+  id: string;
+  amount: number;
+  createdAt: string;
+  product?: { title: string } | null;
+  channel?: { name: string } | null;
+  buyer: { name: string };
+};
 
 function BusinessHomeContent() {
   const { user, refresh } = useAuth();
@@ -13,7 +37,7 @@ function BusinessHomeContent() {
   const id = searchParams.get("id");
   const isSpecificBusiness = Boolean(type && id);
 
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<BusinessProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   // State
@@ -28,10 +52,17 @@ function BusinessHomeContent() {
   const [editFormData, setEditFormData] = useState({ name: "", bio: "", avatar: "", coverImageUrl: "" });
   const [socialLinksStr, setSocialLinksStr] = useState("");
   const [locationStr, setLocationStr] = useState("");
-  
+
   const [saving, setSaving] = useState(false);
 
-  const fetchProfile = async () => {
+  const [team, setTeam] = useState<TeamData | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [invitingTeam, setInvitingTeam] = useState(false);
+  const [teamError, setTeamError] = useState("");
+
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+
+  const fetchProfile = useCallback(async () => {
     if (!user) return;
     try {
       const url = isSpecificBusiness ? `/api/business?type=${type}&id=${id}` : "/api/profile";
@@ -41,12 +72,12 @@ function BusinessHomeContent() {
       try {
         if (!text) throw new Error("Empty response");
         data = JSON.parse(text);
-      } catch (err) {
+      } catch {
         console.warn("Server returned non-JSON response for profile. Falling back to session data.");
         setProfile(user);
         return;
       }
-      
+
       if (res.ok && data) {
         const entity = data.business || data.user;
         if (entity) {
@@ -66,13 +97,38 @@ function BusinessHomeContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, isSpecificBusiness, type, id]);
 
   useEffect(() => {
     fetchProfile();
-  }, [user]);
+  }, [fetchProfile]);
 
-  const saveProfile = async (payload: any) => {
+  const loadTeam = useCallback(async () => {
+    if (!user || !isSpecificBusiness) return;
+    const res = await fetch(`/api/business/team?type=${type}&id=${id}`);
+    const data = await res.json();
+    if (res.ok) setTeam(data);
+  }, [user, isSpecificBusiness, type, id]);
+
+  useEffect(() => {
+    loadTeam();
+  }, [loadTeam]);
+
+  const loadActivity = useCallback(async () => {
+    if (!user) return;
+    const params = new URLSearchParams({ as: "seller" });
+    if (type === "product" && id) params.set("productId", id);
+    if (type === "community" && id) params.set("channelId", id);
+    const res = await fetch(`/api/purchases?${params.toString()}`);
+    const data = await res.json();
+    if (res.ok && Array.isArray(data)) setActivity(data.slice(0, 10));
+  }, [user, type, id]);
+
+  useEffect(() => {
+    loadActivity();
+  }, [loadActivity]);
+
+  const saveProfile = async (payload: Record<string, string | null>) => {
     setSaving(true);
     try {
       const url = isSpecificBusiness ? `/api/business?type=${type}&id=${id}` : "/api/profile";
@@ -81,13 +137,13 @@ function BusinessHomeContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      
+
       const text = await res.text();
       let parseFailed = false;
       try {
         if (!text) throw new Error("Empty response");
         JSON.parse(text);
-      } catch (err) {
+      } catch {
         console.warn("saveProfile received non-JSON response. Proceeding with refresh anyway.");
         parseFailed = true;
       }
@@ -112,12 +168,57 @@ function BusinessHomeContent() {
   };
 
   const copyProfileLink = () => {
-    const link = isSpecificBusiness 
-      ? window.location.origin + `/business/home?type=${type}&id=${id}` 
+    const link = isSpecificBusiness
+      ? window.location.origin + `/business/home?type=${type}&id=${id}`
       : window.location.origin + "/business/home";
     navigator.clipboard.writeText(link);
     alert("Dashboard link copied to clipboard!");
   };
+
+  async function handleInviteSubmit(e: FormEvent) {
+    e.preventDefault();
+    await createInvite(inviteEmail || undefined);
+    setInviteEmail("");
+  }
+
+  async function createInvite(email?: string) {
+    setTeamError("");
+    setInvitingTeam(true);
+    try {
+      const res = await fetch("/api/business/team/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, id, email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setTeamError(data.error || "Failed to create invite");
+        return;
+      }
+      await loadTeam();
+      return data.inviteUrl as string;
+    } finally {
+      setInvitingTeam(false);
+    }
+  }
+
+  async function quickCopyInviteLink() {
+    const url = await createInvite(undefined);
+    if (url) {
+      navigator.clipboard.writeText(url);
+      alert("Invite link copied!");
+    }
+  }
+
+  async function revokeInvite(inviteId: string) {
+    await fetch(`/api/business/team/invite/${inviteId}`, { method: "DELETE" });
+    loadTeam();
+  }
+
+  async function removeMember(memberId: string) {
+    await fetch(`/api/business/team/member/${memberId}`, { method: "DELETE" });
+    loadTeam();
+  }
 
   if (loading) return (
     <div className="flex min-h-screen items-center justify-center">
@@ -125,7 +226,7 @@ function BusinessHomeContent() {
     </div>
   );
 
-  const userData = profile || user;
+  const userData: BusinessProfile = profile ?? user ?? {};
   if (!userData) return null;
 
   const userName = userData.name || "Your Business";
@@ -135,6 +236,7 @@ function BusinessHomeContent() {
   const initial = userName.charAt(0).toUpperCase();
   const userLocation = userData.location;
   const hasSocials = !!userData.socialLinks;
+  const teamCount = 1 + (team?.members.length ?? 0);
 
   return (
     <div className="flex h-full min-h-screen font-sans">
@@ -149,20 +251,25 @@ function BusinessHomeContent() {
             <button onClick={() => setShowNotifications(!showNotifications)} className="text-zinc-500 hover:text-amber-600 transition">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" /></svg>
             </button>
-            
+
             {showNotifications && (
-              <div className="absolute right-0 top-8 mt-2 w-72 rounded-xl border border-zinc-200 bg-white p-4 shadow-xl z-50">
-                <h3 className="font-bold text-sm text-zinc-900 mb-3">Notifications</h3>
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="h-2 w-2 mt-1.5 rounded-full bg-amber-500 shrink-0" />
-                    <p className="text-sm text-zinc-600">Welcome to your upgraded business dashboard!</p>
+              <div className="absolute right-0 top-8 mt-2 w-80 rounded-xl border border-zinc-200 bg-white p-4 shadow-xl z-50">
+                <h3 className="font-bold text-sm text-zinc-900 mb-3">Recent sales</h3>
+                {activity.length === 0 ? (
+                  <p className="text-sm text-zinc-500">No sales yet.</p>
+                ) : (
+                  <div className="flex flex-col gap-3 max-h-72 overflow-y-auto">
+                    {activity.slice(0, 6).map((a) => (
+                      <div key={a.id} className="flex items-start gap-3">
+                        <div className="h-2 w-2 mt-1.5 rounded-full bg-green-500 shrink-0" />
+                        <p className="text-sm text-zinc-600">
+                          <span className="font-medium text-zinc-900">{a.buyer.name}</span> purchased{" "}
+                          {a.product?.title || a.channel?.name || "an item"} for ${a.amount.toFixed(2)}
+                        </p>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="h-2 w-2 mt-1.5 rounded-full bg-green-500 shrink-0" />
-                    <p className="text-sm text-zinc-600">Your profile is now public and shareable.</p>
-                  </div>
-                </div>
+                )}
               </div>
             )}
           </div>
@@ -175,19 +282,19 @@ function BusinessHomeContent() {
               <Image src={coverUrl} alt="Cover" fill className="object-cover opacity-90 mix-blend-overlay" unoptimized />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center z-10">
-                 <span className="text-5xl opacity-50">🏢</span> 
+                 <span className="text-5xl opacity-50">🏢</span>
               </div>
             )}
-            
+
             {/* Edit Cover button on hover */}
-            <button 
+            <button
               onClick={() => setEditProfileModalOpen(true)}
               className="absolute top-4 right-4 z-30 opacity-0 group-hover:opacity-100 transition flex items-center gap-2 rounded-lg bg-black/50 backdrop-blur px-3 py-1.5 text-xs font-semibold text-white hover:bg-black/70"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
               Edit Cover
             </button>
-            
+
             {/* Avatar Profile */}
             <div className="absolute -bottom-10 left-8 z-20 rounded-3xl border-4 border-white bg-white overflow-hidden shadow-lg h-28 w-28 flex items-center justify-center group/avatar cursor-pointer" onClick={() => setEditProfileModalOpen(true)}>
               {avatarUrl ? (
@@ -222,16 +329,18 @@ function BusinessHomeContent() {
                   </button>
                   <span>·</span>
                   <div className="flex items-center gap-1.5">
-                    Created by 
+                    Created by
                     <div className="ml-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-[10px] font-bold text-white">
                       {user?.avatar ? <Image src={user.avatar} alt="" width={20} height={20} className="object-cover" unoptimized /> : user?.name?.charAt(0).toUpperCase()}
                     </div>
                     <span className="font-medium text-zinc-900">{user?.name}</span>
                   </div>
                 </div>
-                <div className="mt-4 text-sm font-medium text-zinc-900 cursor-pointer" onClick={() => setTeamModalOpen(true)}>
-                  1 <span className="text-zinc-500 font-normal hover:text-amber-600">members</span>
-                </div>
+                {isSpecificBusiness && (
+                  <div className="mt-4 text-sm font-medium text-zinc-900 cursor-pointer" onClick={() => setTeamModalOpen(true)}>
+                    {teamCount} <span className="text-zinc-500 font-normal hover:text-amber-600">member{teamCount === 1 ? "" : "s"}</span>
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => setEditProfileModalOpen(true)} className="rounded-lg border border-zinc-200 bg-white p-2 text-zinc-500 hover:bg-zinc-50 hover:text-amber-600 shadow-sm transition">
@@ -240,16 +349,18 @@ function BusinessHomeContent() {
                 <button onClick={copyProfileLink} className="rounded-lg border border-zinc-200 bg-white p-2 text-zinc-500 hover:bg-zinc-50 hover:text-amber-600 shadow-sm transition">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
                 </button>
-                <button onClick={() => setTeamModalOpen(true)} className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-white shadow-md shadow-amber-500/25 hover:bg-amber-600 transition">
-                  Add team <span className="text-lg leading-none">+</span>
-                </button>
+                {isSpecificBusiness && (
+                  <button onClick={() => setTeamModalOpen(true)} className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-white shadow-md shadow-amber-500/25 hover:bg-amber-600 transition">
+                    Add team <span className="text-lg leading-none">+</span>
+                  </button>
+                )}
               </div>
             </div>
 
             {/* Tabs */}
             <div className="mt-8 border-b border-zinc-200 flex gap-6 sm:gap-8 overflow-x-auto text-sm font-medium text-zinc-500 pb-[1px]">
-              {["Home", "Chats", "Apps", "About"].map(tab => (
-                 <button 
+              {["Home", "Apps", "About"].map(tab => (
+                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className={`pb-4 transition whitespace-nowrap border-b-2 ${activeTab === tab ? 'border-amber-500 text-zinc-900' : 'border-transparent hover:border-zinc-300 hover:text-zinc-900'}`}
@@ -262,32 +373,29 @@ function BusinessHomeContent() {
             {/* Tab Contents */}
             <div className="mt-6">
               {activeTab === "Home" && (
-                <div className="flex flex-col gap-6">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-amber-400 to-orange-500 font-bold text-white shadow-sm">
-                      {avatarUrl ? <Image src={avatarUrl} alt="" width={40} height={40} className="object-cover" unoptimized /> : initial}
+                <div className="flex flex-col gap-3">
+                  {activity.length === 0 ? (
+                    <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
+                      <div className="mx-auto h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 mb-3">
+                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                      </div>
+                      <h3 className="text-zinc-900 font-bold">No activity yet</h3>
+                      <p className="text-zinc-500 text-sm mt-1">Sales and other activity for this business will show up here.</p>
                     </div>
-                    <input 
-                      type="text" 
-                      placeholder="Share an update with your community..." 
-                      className="flex-1 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none hover:bg-zinc-50 transition shadow-sm"
-                    />
-                  </div>
-                  <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
-                    <div className="mx-auto h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 mb-3">
-                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-                    </div>
-                    <h3 className="text-zinc-900 font-bold">No posts yet</h3>
-                    <p className="text-zinc-500 text-sm mt-1">Start by sharing an update above.</p>
-                  </div>
-                </div>
-              )}
-              {activeTab === "Chats" && (
-                <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center shadow-sm min-h-[200px] flex flex-col items-center justify-center">
-                  <svg className="w-12 h-12 text-zinc-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-                  <h3 className="text-zinc-900 font-bold">Community Chats</h3>
-                  <p className="text-zinc-500 text-sm mt-1 max-w-sm">Create dedicated chat rooms for your members to connect, support each other, and discuss your products.</p>
-                  <button className="mt-4 rounded-lg bg-zinc-900 px-4 py-2 font-medium text-white hover:bg-zinc-800">Create new chat</button>
+                  ) : (
+                    activity.map((a) => (
+                      <div key={a.id} className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+                        <div>
+                          <p className="text-sm text-zinc-900">
+                            <span className="font-semibold">{a.buyer.name}</span> purchased{" "}
+                            {a.product?.title || a.channel?.name || "an item"}
+                          </p>
+                          <p className="text-xs text-zinc-400 mt-0.5">{new Date(a.createdAt).toLocaleString()}</p>
+                        </div>
+                        <span className="text-sm font-semibold text-amber-600">${a.amount.toFixed(2)}</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
               {activeTab === "Apps" && (
@@ -301,7 +409,7 @@ function BusinessHomeContent() {
                 <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
                   <h3 className="font-bold text-zinc-900 mb-2">About {userName}</h3>
                   <p className="text-zinc-600 text-sm whitespace-pre-wrap">{userBio}</p>
-                  
+
                   {hasSocials && (
                     <div className="mt-6 pt-6 border-t border-zinc-100">
                       <h4 className="font-medium text-zinc-900 text-sm mb-3">Links</h4>
@@ -315,7 +423,7 @@ function BusinessHomeContent() {
         </div>
 
         {/* --- Modals --- */}
-        
+
         {/* 1. Edit Profile Modal */}
         {isEditProfileModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
@@ -393,26 +501,83 @@ function BusinessHomeContent() {
                 </button>
               </div>
 
-              <div className="space-y-4 mb-6">
+              <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
                 <div className="flex items-center justify-between p-3 border border-amber-200 bg-amber-50 rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 overflow-hidden rounded-full bg-amber-500 flex items-center justify-center text-white font-bold">
                       {initial}
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-zinc-900">{userName}</div>
+                      <div className="text-sm font-medium text-zinc-900">{team?.owner?.name || userName}</div>
                       <div className="text-xs text-zinc-500">Owner</div>
                     </div>
                   </div>
                 </div>
+
+                {team?.members.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between p-3 border border-zinc-200 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 overflow-hidden rounded-full bg-zinc-200 flex items-center justify-center text-zinc-700 font-bold">
+                        {m.user.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-zinc-900">{m.user.name}</div>
+                        <div className="text-xs text-zinc-500">{m.user.email}</div>
+                      </div>
+                    </div>
+                    <button onClick={() => removeMember(m.id)} className="text-xs text-red-500 hover:text-red-700">Remove</button>
+                  </div>
+                ))}
+
+                {team?.invites.map((inv) => (
+                  <div key={inv.id} className="flex items-center justify-between p-3 border border-dashed border-zinc-200 rounded-lg">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-zinc-700 truncate">{inv.email || "Anyone with the link"}</div>
+                      <div className="text-xs text-zinc-400">Pending invite</div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${window.location.origin}/invite/${inv.token}`);
+                          alert("Invite link copied!");
+                        }}
+                        className="text-xs text-amber-700 hover:underline"
+                      >
+                        Copy link
+                      </button>
+                      <button onClick={() => revokeInvite(inv.id)} className="text-xs text-red-500 hover:text-red-700">Revoke</button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              
+
+              {teamError && <p className="text-xs text-rose-600 mb-3">{teamError}</p>}
+
               <div className="border-t border-zinc-200 pt-5">
                 <h3 className="text-sm font-medium text-zinc-900 mb-3">Invite new members</h3>
-                <div className="flex gap-2">
-                  <input type="text" readOnly value={`${window.location.origin}/invite/bus_${userData.id?.slice(0,8)}`} className="flex-1 rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-xs text-zinc-500 outline-none" />
-                  <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/invite/bus_${userData.id?.slice(0,8)}`); alert("Invite link copied!") }} className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800">Copy</button>
-                </div>
+                <form onSubmit={handleInviteSubmit} className="flex gap-2 mb-3">
+                  <input
+                    type="email"
+                    placeholder="Email address"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-amber-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={invitingTeam || !inviteEmail}
+                    className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-50"
+                  >
+                    Send
+                  </button>
+                </form>
+                <button
+                  onClick={quickCopyInviteLink}
+                  disabled={invitingTeam}
+                  className="w-full rounded-lg bg-zinc-50 border border-zinc-200 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 transition disabled:opacity-50"
+                >
+                  Or generate a shareable invite link
+                </button>
               </div>
             </div>
           </div>
@@ -421,54 +586,49 @@ function BusinessHomeContent() {
 
       {/* Right Sidebar */}
       <div className="hidden lg:block w-72 shrink-0 bg-amber-50/20 p-6 border-l border-zinc-100">
-        <div className="relative mb-6">
-          <svg className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-          <input type="text" placeholder="Search Business" className="w-full rounded-lg border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm outline-none placeholder:text-zinc-400 focus:border-amber-500 focus:ring-1 focus:ring-amber-500" />
-          <div className="absolute right-2 top-2 flex items-center justify-center rounded border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">⌘K</div>
-        </div>
-
         <nav className="space-y-4 mb-8 text-sm font-medium text-zinc-700">
           <Link href="/business/marketing" className="flex items-center gap-3 hover:text-amber-600 transition">
             <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>
             Ads
           </Link>
-          <Link href="/business/developers" className="flex items-center gap-3 hover:text-amber-600 transition">
+          <Link href="/business/marketing?tab=Affiliate%20links" className="flex items-center gap-3 hover:text-amber-600 transition">
             <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
             Affiliates
           </Link>
         </nav>
 
-        {/* People Card */}
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-zinc-900">People <span className="text-zinc-400 font-normal">1</span></h3>
-            <button onClick={() => setTeamModalOpen(true)} className="text-sm font-medium text-amber-600 hover:text-amber-700">See all</button>
-          </div>
-          
-          <div className="mb-4">
-            <div className="mb-3 text-[10px] font-bold uppercase tracking-wider text-amber-500">Team</div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-amber-400 to-orange-500 shadow-sm font-bold text-white">
-                    {avatarUrl ? <Image src={avatarUrl} alt="" width={40} height={40} className="object-cover" unoptimized /> : initial}
-                  </div>
-                  <div className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-green-500"></div>
-                </div>
-                <div className="min-w-0">
-                   <div className="text-sm font-medium text-zinc-900 truncate pr-2 max-w-[80px]">{userName}</div>
-                   <div className="text-xs text-zinc-500 truncate pr-2 max-w-[80px]">@{userName?.toLowerCase().replace(/\s/g, "") || "user"}</div>
-                </div>
-              </div>
-              <span className="rounded bg-amber-50 border border-amber-200 px-2 py-1 text-xs font-semibold text-amber-800">Owner</span>
+        {isSpecificBusiness && (
+          <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-zinc-900">People <span className="text-zinc-400 font-normal">{teamCount}</span></h3>
+              <button onClick={() => setTeamModalOpen(true)} className="text-sm font-medium text-amber-600 hover:text-amber-700">See all</button>
             </div>
-          </div>
 
-          <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/invite/bus_${userData.id?.slice(0,8)}`); alert("Invite link copied!") }} className="w-full rounded-lg bg-zinc-50 border border-zinc-200 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 transition flex items-center justify-center gap-2">
-            <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-            Copy invite link
-          </button>
-        </div>
+            <div className="mb-4">
+              <div className="mb-3 text-[10px] font-bold uppercase tracking-wider text-amber-500">Team</div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-amber-400 to-orange-500 shadow-sm font-bold text-white">
+                      {avatarUrl ? <Image src={avatarUrl} alt="" width={40} height={40} className="object-cover" unoptimized /> : initial}
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-green-500"></div>
+                  </div>
+                  <div className="min-w-0">
+                     <div className="text-sm font-medium text-zinc-900 truncate pr-2 max-w-[80px]">{userName}</div>
+                     <div className="text-xs text-zinc-500 truncate pr-2 max-w-[80px]">@{userName?.toLowerCase().replace(/\s/g, "") || "user"}</div>
+                  </div>
+                </div>
+                <span className="rounded bg-amber-50 border border-amber-200 px-2 py-1 text-xs font-semibold text-amber-800">Owner</span>
+              </div>
+            </div>
+
+            <button onClick={quickCopyInviteLink} disabled={invitingTeam} className="w-full rounded-lg bg-zinc-50 border border-zinc-200 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 transition flex items-center justify-center gap-2 disabled:opacity-50">
+              <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+              Copy invite link
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

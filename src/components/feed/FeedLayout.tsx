@@ -1,11 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useAuth } from "@/context/AuthContext";
 
 export function FeedLayout({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-
   return (
     <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6">
       {/* Left Sidebar */}
@@ -53,15 +50,13 @@ export function FeedLayout({ children }: { children: React.ReactNode }) {
             <span className="text-xl">📚</span>
             My Library
           </Link>
-          {(user?.role === "seller" || user?.role === "admin") && (
-            <Link
-              href="/dashboard/new"
-              className="mt-4 flex items-center gap-3 rounded-lg border-2 border-dashed border-amber-300 bg-amber-50/50 px-4 py-3 font-medium text-amber-800 hover:bg-amber-100"
-            >
-              <span className="text-xl">+</span>
-              Create Product
-            </Link>
-          )}
+          <Link
+            href="/dashboard/new"
+            className="mt-4 flex items-center gap-3 rounded-lg border-2 border-dashed border-amber-300 bg-amber-50/50 px-4 py-3 font-medium text-amber-800 hover:bg-amber-100"
+          >
+            <span className="text-xl">+</span>
+            Create Product
+          </Link>
           <div className="mt-6 border-t border-zinc-200 pt-4">
             <p className="px-4 text-xs font-medium uppercase tracking-wider text-zinc-400">
               Resources

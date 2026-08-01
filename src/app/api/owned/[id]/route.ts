@@ -26,6 +26,9 @@ export async function GET(
     if (!purchase || purchase.buyerId !== session.userId) {
       return NextResponse.json({ error: "Purchase not found" }, { status: 404 });
     }
+    if (purchase.refunded) {
+      return NextResponse.json({ error: "This purchase was refunded — access has been revoked" }, { status: 403 });
+    }
 
     return NextResponse.json(purchase);
   } catch (error) {

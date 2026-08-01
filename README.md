@@ -1,6 +1,6 @@
 # Ailexity Market
 
-A full-stack digital platform combining e-commerce and social networking. Built with Next.js and React, it enables creators to sell digital products (ebooks, courses), engage audiences, and grow through channels—with secure payments and role-based access (admin, seller, buyer).
+A digital marketplace for ebooks and courses, similar to Whop. Buy and sell digital content with a full admin panel.
 
 ## Features
 
@@ -23,13 +23,18 @@ A full-stack digital platform combining e-commerce and social networking. Built 
 
    Copy `.env.example` to `.env` and set:
 
-   - `DATABASE_URL` - SQLite path (default `file:./dev.db` works for local dev)
-   - `JWT_SECRET` - Change in production!
+   - `DATABASE_URL` / `DIRECT_URL` - PostgreSQL connection strings
+   - `JWT_SECRET` - change in production!
+   - `ENCRYPTION_KEY` - change in production!
+
+   **Local Postgres setup:**
+   1. Install PostgreSQL and create a database: `createdb ailexity_market`
+   2. Update `DATABASE_URL` and `DIRECT_URL` in `.env` if your credentials differ from the defaults
 
 3. **Initialize database**
 
    ```bash
-   npm run db:push
+   npx prisma migrate deploy
    ```
 
 4. **Seed sample data (creates admin + sample products)**
@@ -75,12 +80,16 @@ Then create a user with `role: "admin"` and a bcrypt-hashed password.
 - `src/components/` - Shared UI components
 - `src/context/` - Auth context
 - `src/lib/` - Prisma client, auth utilities
-- `prisma/` - Database schema and seed
+- `prisma/` - Database schema and migrations
 
 ## Tech Stack
 
 - Next.js 16 (App Router)
-- Prisma + MongoDB
+- Prisma + PostgreSQL
 - Tailwind CSS
 - JWT (jose) for auth
 - bcryptjs for passwords
+
+## Deployment
+
+See [DEPLOY.md](./DEPLOY.md) for deploying to a Hostinger VPS (Node.js + PM2 + Nginx + PostgreSQL).

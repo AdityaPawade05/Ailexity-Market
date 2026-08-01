@@ -4,15 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { uploadFile } from "@/lib/upload";
 
-export default function NewProductPage() {
+export default function CreatePage() {
   const { user } = useAuth();
   const router = useRouter();
-  
+
   const [loading, setLoading] = useState(false);
   const [generatingAi, setGeneratingAi] = useState(false);
   const [error, setError] = useState("");
-  
+
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -28,7 +29,7 @@ export default function NewProductPage() {
 
   const [fileMode, setFileMode] = useState<"url" | "upload">("url");
   const [imageMode, setImageMode] = useState<"url" | "upload">("url");
-  const [audioMode, setAudioMode] = useState<"url" | "upload">("url");
+
   const [courseContent, setCourseContent] = useState([{ title: "", videoUrl: "" }]);
 
   async function generateDescription() {
@@ -55,14 +56,14 @@ export default function NewProductPage() {
       if (!res.ok) throw new Error(data.error || "Failed to generate");
       
       setForm((prev) => ({ ...prev, description: data.description }));
-    } catch (err: any) {
-      setError(err.message || "Failed to generate AI description.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate AI description.");
     } finally {
       setGeneratingAi(false);
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleCreateProduct(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -107,11 +108,15 @@ export default function NewProductPage() {
           </svg>
           Back to Dashboard
         </Link>
-        <div className="mt-4 flex items-end justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Create New Product</h1>
-            <p className="mt-2 text-zinc-500">Add a new ebook, course, or tool to your store catalog.</p>
-          </div>
+        <div className="mt-4">
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Create Product</h1>
+          <p className="mt-2 text-zinc-500">
+            Sell an ebook, course, or SaaS tool. Looking to start a paid community instead?{" "}
+            <Link href="/channel/new" className="font-medium text-amber-600 hover:underline">
+              Create a community
+            </Link>
+            .
+          </p>
         </div>
       </div>
 
@@ -124,7 +129,8 @@ export default function NewProductPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+      {/* ── Product Form ── */}
+      <form onSubmit={handleCreateProduct} className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         
         {/* ── Main Form Column (Left) ── */}
         <div className="lg:col-span-2 space-y-8">
@@ -292,12 +298,15 @@ export default function NewProductPage() {
                         <input
                           type="file"
                           accept="image/*"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (!file) return;
-                            const reader = new FileReader();
-                            reader.onloadend = () => setForm({ ...form, imageUrl: reader.result as string });
-                            reader.readAsDataURL(file);
+                            try {
+                              const url = await uploadFile(file, "image");
+                              setForm((prev) => ({ ...prev, imageUrl: url }));
+                            } catch (err) {
+                              setError(err instanceof Error ? err.message : "Image upload failed");
+                            }
                           }}
                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         />
@@ -407,12 +416,15 @@ export default function NewProductPage() {
                         <input
                           type="file"
                           accept=".pdf,.zip,.mp4"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (!file) return;
-                            const reader = new FileReader();
-                            reader.onloadend = () => setForm({ ...form, fileUrl: reader.result as string });
-                            reader.readAsDataURL(file);
+                            try {
+                              const url = await uploadFile(file, "product");
+                              setForm((prev) => ({ ...prev, fileUrl: url }));
+                            } catch (err) {
+                              setError(err instanceof Error ? err.message : "File upload failed");
+                            }
                           }}
                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         />
@@ -423,10 +435,10 @@ export default function NewProductPage() {
                         <p className="text-xs text-zinc-500 mt-1">PDF, ZIP, or MP4 up to 50MB</p>
                       </div>
                     )}
-                    {form.fileUrl?.startsWith('data:') && (
+                    {form.fileUrl && !form.fileUrl.startsWith("http") && !form.fileUrl.startsWith("data:") && (
                       <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-700 border border-green-200">
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        File encoded and ready for upload
+                        File uploaded successfully
                       </div>
                     )}
                   </div>

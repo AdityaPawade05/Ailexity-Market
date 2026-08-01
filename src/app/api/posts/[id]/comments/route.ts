@@ -20,19 +20,7 @@ export async function GET(
     orderBy: { createdAt: "asc" },
   });
 
-  let commentsWithAttachments = comments;
-  try {
-    if (comments.length > 0 && !('attachmentUrl' in comments[0])) {
-      const rawComments: any[] = await prisma.$queryRawUnsafe(`SELECT "id", "attachmentUrl", "attachmentType" FROM "Comment" WHERE "postId" = ?`, id);
-      const attachmentsMap = new Map(rawComments.map((c: any) => [c.id, { url: c.attachmentUrl, type: c.attachmentType }]));
-      commentsWithAttachments = comments.map((c: any) => {
-        const attach = attachmentsMap.get(c.id);
-        return { ...c, attachmentUrl: attach?.url || null, attachmentType: attach?.type || null };
-      }) as any;
-    }
-  } catch(e) {}
-
-  return NextResponse.json(commentsWithAttachments);
+  return NextResponse.json(comments);
 }
 
 export async function POST(
@@ -59,35 +47,18 @@ export async function POST(
     return NextResponse.json({ error: "Post not found" }, { status: 404 });
   }
 
-  let comment;
-  try {
-    comment = await prisma.comment.create({
-      data: {
-        content: content?.trim() || "",
-        attachmentUrl: attachmentUrl || null,
-        attachmentType: attachmentType || null,
-        userId: session.userId,
-        postId,
-      } as any,
-      include: {
-        user: { select: { id: true, name: true, avatar: true } },
-      },
-    });
-  } catch (e: any) {
-    if (e.message?.includes('Unknown argument')) {
-      const fallbackId = "cm" + Math.random().toString(36).slice(2) + Date.now().toString(36);
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "Comment" ("id", "content", "attachmentUrl", "attachmentType", "userId", "postId", "createdAt") VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-        fallbackId, content?.trim() || "", attachmentUrl || null, attachmentType || null, session.userId, postId
-      );
-      comment = await prisma.comment.findUnique({
-        where: { id: fallbackId },
-        include: { user: { select: { id: true, name: true, avatar: true } } }
-      });
-    } else {
-      throw e;
-    }
-  }
+  const comment = await prisma.comment.create({
+    data: {
+      content: content?.trim() || "",
+      attachmentUrl: attachmentUrl || null,
+      attachmentType: attachmentType || null,
+      userId: session.userId,
+      postId,
+    },
+    include: {
+      user: { select: { id: true, name: true, avatar: true } },
+    },
+  });
 
   return NextResponse.json(comment);
 }

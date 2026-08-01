@@ -31,11 +31,27 @@ type ChannelItem = {
   postsCount: number | null;
 };
 
+type Profile = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar: string | null;
+  coverImageUrl: string | null;
+  bio: string | null;
+  location: string | null;
+  socialLinks: string | null;
+  username?: string | null;
+  createdAt: string;
+  followersCount?: number;
+  followingCount?: number;
+};
+
 export default function ProfilePage() {
   const { user, loading, refresh } = useAuth();
   const router = useRouter();
 
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [channels, setChannels] = useState<ChannelItem[]>([]);
   const [editOpen, setEditOpen] = useState(false);
@@ -49,7 +65,7 @@ export default function ProfilePage() {
     return profile.username || profile.name?.replace(/\s/g, "").toLowerCase() || "";
   }, [profile]);
 
-  const isVerified = profile?.role === "seller" || profile?.role === "admin";
+  const isVerified = profile?.role === "admin" || products.length > 0;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -58,15 +74,13 @@ export default function ProfilePage() {
     }
 
     if (user) {
-      setDataLoading(true);
       Promise.all([
-        fetch("/api/profile").then((r) => r.ok ? r.json() : {}),
-        fetch("/api/my-products").then((r) => r.ok ? r.json() : []),
-        fetch(`/api/channels?ownerId=${user.id}`).then((r) => r.ok ? r.json() : []),
+        fetch("/api/profile").then((r): Promise<{ user?: Profile } | null> => (r.ok ? r.json() : Promise.resolve(null))),
+        fetch("/api/my-products").then((r) => (r.ok ? r.json() : [])),
+        fetch(`/api/channels?ownerId=${user.id}`).then((r) => (r.ok ? r.json() : [])),
       ])
         .then(([profileData, productsData, channelsData]) => {
-          const profilePayload = profileData as { user?: typeof profile };
-          if (profilePayload.user) setProfile(profilePayload.user);
+          if (profileData?.user) setProfile(profileData.user);
           if (Array.isArray(productsData)) setProducts(productsData);
           if (Array.isArray(channelsData)) setChannels(channelsData);
         })
@@ -75,8 +89,8 @@ export default function ProfilePage() {
     }
   }, [user, loading, router]);
 
-  function handleProfileSaved(updated: any) {
-    setProfile((prev: any) => ({ ...prev, ...updated }));
+  function handleProfileSaved(updated: Partial<Profile>) {
+    setProfile((prev) => (prev ? { ...prev, ...updated } : prev));
     refresh();
   }
 
@@ -112,8 +126,8 @@ export default function ProfilePage() {
   const roleLabel =
     profile.role === "admin"
       ? "Admin"
-      : profile.role === "seller"
-        ? "Digital Creator"
+      : products.length > 0
+        ? "Creator"
         : "Member";
 
   return (
@@ -251,7 +265,7 @@ export default function ProfilePage() {
             ] as const).map(([key, icon, label]) => (
               <button
                 key={key}
-                onClick={() => setTab(key as any)}
+                onClick={() => setTab(key)}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold tracking-wide uppercase transition-all border-b-2 ${
                   tab === key
                     ? "border-amber-500 text-amber-700 bg-amber-50/30"
@@ -286,14 +300,12 @@ export default function ProfilePage() {
                 <p className="mt-1 text-sm text-zinc-500 max-w-xs">
                   Start selling digital products — they&apos;ll appear in your profile grid.
                 </p>
-                {(profile.role === "seller" || profile.role === "admin") && (
-                  <Link
-                    href="/dashboard"
-                    className="mt-4 rounded-lg bg-amber-500 px-5 py-2 text-sm font-semibold text-white hover:bg-amber-600 transition-colors"
-                  >
-                    Create Product
-                  </Link>
-                )}
+                <Link
+                  href="/dashboard"
+                  className="mt-4 rounded-lg bg-amber-500 px-5 py-2 text-sm font-semibold text-white hover:bg-amber-600 transition-colors"
+                >
+                  Create Product
+                </Link>
               </div>
             ) : (
               /* 3-column IG grid */

@@ -36,9 +36,9 @@ export async function POST(
     await prisma.like.create({
       data: { userId: session.userId, postId },
     });
-  } catch (error: any) {
+  } catch (error) {
     // Ignore unique constraint violation (P2002) due to race condition
-    if (error.code !== "P2002") {
+    if ((error as { code?: string })?.code !== "P2002") {
       return NextResponse.json({ error: "Failed to like post" }, { status: 500 });
     }
   }

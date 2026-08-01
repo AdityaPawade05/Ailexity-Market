@@ -57,7 +57,7 @@ export function UserHoverCard({
             <div className="-mt-8 flex items-end gap-3">
               <div className="flex h-16 w-16 shrink-0 overflow-hidden rounded-full border-4 border-white bg-amber-100">
                 {user.avatar ? (
-                  // eslint-disable-next-line @next/next/no-img-element
+                   
                   <img src={user.avatar} alt="" className="h-full w-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-amber-800">

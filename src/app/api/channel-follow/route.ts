@@ -18,7 +18,7 @@ export async function POST(request: Request) {
 
   const channel = await prisma.channel.findUnique({
     where: { id: channelId },
-    select: { id: true },
+    select: { id: true, ownerId: true, price: true },
   });
   if (!channel) {
     return NextResponse.json({ error: "Channel not found" }, { status: 404 });
@@ -36,6 +36,21 @@ export async function POST(request: Request) {
   if (existing) {
     await prisma.channelFollow.delete({ where: { id: existing.id } });
     return NextResponse.json({ following: false });
+  }
+
+  // Paid channels require a purchase to join — only let previous buyers
+  // (and the owner) follow without paying.
+  if (channel.price > 0 && channel.ownerId !== session.userId) {
+    const purchased = await prisma.purchase.findFirst({
+      where: { buyerId: session.userId, channelId },
+      select: { id: true },
+    });
+    if (!purchased) {
+      return NextResponse.json(
+        { error: "This is a paid community. Please purchase access to join.", requiresPurchase: true },
+        { status: 402 }
+      );
+    }
   }
 
   await prisma.channelFollow.create({

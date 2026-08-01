@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { parsePrice } from "@/lib/money";
+import { Prisma } from "@prisma/client";
 
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Login required" }, { status: 401 });
-  }
-
-  if (!["admin", "seller", "buyer", "user"].includes(session.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
   try {
@@ -19,46 +17,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Channel name is required" }, { status: 400 });
     }
 
-    let channel: any;
-    try {
-      channel = await prisma.channel.create({
-        data: {
-          name: name.trim(),
-          description: description?.trim() || null,
-          coverImageUrl: coverImageUrl || null,
-          avatarUrl: avatarUrl || null,
-          category: category || null,
-          price: parseFloat(price) || 0,
-          ownerId: session.userId,
-        } as any,
-        include: {
-          owner: {
-            select: { id: true, name: true, avatar: true },
-          },
+    const parsedPrice = price === undefined || price === null || price === "" ? 0 : parsePrice(price);
+    if (parsedPrice === null) {
+      return NextResponse.json({ error: "Price must be a non-negative number" }, { status: 400 });
+    }
+
+    const channel = await prisma.channel.create({
+      data: {
+        name: name.trim(),
+        description: description?.trim() || null,
+        coverImageUrl: coverImageUrl || null,
+        avatarUrl: avatarUrl || null,
+        category: category || null,
+        price: parsedPrice,
+        ownerId: session.userId,
+      },
+      include: {
+        owner: {
+          select: { id: true, name: true, avatar: true },
         },
-      });
-    } catch (e: any) {
-      if (e.message?.includes('Unknown argument')) {
-        // Fallback for Windows Prisma EPERM Node-locks
-        // Manually inject exactly into the SQLite schema bypassing the outdated Node.JS API Client cache
-        const cuidFallback = "cm" + Math.random().toString(36).slice(2) + Date.now().toString(36);
-        await prisma.$executeRawUnsafe(
-          `INSERT INTO "Channel" ("id", "name", "description", "coverImageUrl", "avatarUrl", "category", "price", "ownerId", "updatedAt") VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-          cuidFallback, name.trim(), description?.trim() || null, coverImageUrl || null, avatarUrl || null, category || null, parseFloat(price) || 0, session.userId
-        );
-        channel = await prisma.channel.findUnique({
-          where: { id: cuidFallback },
-          include: { owner: { select: { id: true, name: true, avatar: true } } }
-        });
-      } else {
-        throw e;
-      }
-    }
-    
-    // Ensure price is attached on return map
-    if (channel && !('price' in channel)) {
-      channel.price = parseFloat(price) || 0;
-    }
+      },
+    });
 
     return NextResponse.json(channel);
   } catch (error) {
@@ -70,10 +49,22 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const ownerId = searchParams.get('ownerId');
+    const ownerId = searchParams.get("ownerId");
+    const search = searchParams.get("search");
+    const category = searchParams.get("category");
+
+    const where: Prisma.ChannelWhereInput = {};
+    if (ownerId) where.ownerId = ownerId;
+    if (category) where.category = category;
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+      ];
+    }
 
     const channels = await prisma.channel.findMany({
-      where: ownerId ? { ownerId } : undefined,
+      where,
       include: {
         owner: {
           select: { id: true, name: true, avatar: true },
@@ -83,17 +74,12 @@ export async function GET(request: Request) {
       orderBy: { createdAt: "desc" },
     });
 
-    // Fallback for outdated Prisma client missing 'price' on GET
-    let channelsWithPrice = channels;
-    try {
-      if (channels.length > 0 && !('price' in channels[0])) {
-        const rawChannels: any[] = await prisma.$queryRawUnsafe(`SELECT id, price FROM "Channel"`);
-        const priceMap = new Map(rawChannels.map((c: any) => [c.id, c.price]));
-        channelsWithPrice = channels.map((c: any) => ({ ...c, price: priceMap.get(c.id) || 0 })) as any;
-      }
-    } catch(e) {}
+    const withFollowersCount = channels.map((channel) => ({
+      ...channel,
+      followersCount: channel._count.channelFollows,
+    }));
 
-    return NextResponse.json(channelsWithPrice);
+    return NextResponse.json(withFollowersCount);
   } catch (error) {
     console.error("Get channels error:", error);
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });

@@ -2,18 +2,20 @@
 
 import { useState } from "react";
 
+type EditableProfile = {
+  name: string;
+  bio: string | null;
+  location: string | null;
+  avatar: string | null;
+  coverImageUrl: string | null;
+  socialLinks: string | null;
+};
+
 type EditProfileModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  profile: {
-    name: string;
-    bio: string | null;
-    location: string | null;
-    avatar: string | null;
-    coverImageUrl: string | null;
-    socialLinks: string | null;
-  };
-  onSaved: (updated: any) => void;
+  profile: EditableProfile;
+  onSaved: (updated: Partial<EditableProfile>) => void;
 };
 
 export function EditProfileModal({ isOpen, onClose, profile, onSaved }: EditProfileModalProps) {
@@ -66,7 +68,7 @@ export function EditProfileModal({ isOpen, onClose, profile, onSaved }: EditProf
           </button>
           <h2 className="text-base font-bold text-zinc-900">Edit Profile</h2>
           <button
-            onClick={handleSave as any}
+            onClick={handleSave}
             disabled={saving}
             className="text-sm font-bold text-amber-600 hover:text-amber-700 disabled:opacity-50 transition-colors"
           >

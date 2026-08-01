@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { Outfit, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { Providers } from "@/components/Providers";
-import { Navbar } from "@/components/Navbar";
-import { AIChatWidget } from "@/components/AIChatWidget";
+import { SiteChrome } from "@/components/SiteChrome";
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -31,11 +29,7 @@ export default function RootLayout({
       className={`${outfit.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-zinc-50 font-sans">
-        <Providers>
-          <Navbar />
-          <main className="flex-1">{children}</main>
-          <AIChatWidget />
-        </Providers>
+        <SiteChrome>{children}</SiteChrome>
       </body>
     </html>
   );

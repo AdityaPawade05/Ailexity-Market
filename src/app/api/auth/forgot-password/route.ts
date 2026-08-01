@@ -10,17 +10,19 @@ const JWT_SECRET = new TextEncoder().encode(
 export async function POST(request: Request) {
   try {
     const { email } = await request.json();
-    if (!email) {
+    if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email: email.trim().toLowerCase() },
+    });
     if (!user) {
       // Don't leak whether user exists, just return success
       return NextResponse.json({ success: true });
     }
 
-    const token = await new SignJWT({ userId: user.id, email: user.email })
+    const token = await new SignJWT({ userId: user.id, email: user.email, purpose: "password-reset" })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuedAt()
       .setExpirationTime("15m")

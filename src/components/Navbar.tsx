@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useState, useRef, useEffect } from "react";
 
 export function Navbar() {
-  const { user, loading, refresh } = useAuth();
+  const { user, loading, refresh, walletBalance, cartCount, wishlistCount, unreadMessageCount } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -29,7 +29,7 @@ export function Navbar() {
     const form = e.currentTarget;
     const q = (form.elements.namedItem("search") as HTMLInputElement)?.value?.trim();
     if (q) {
-      router.push(`/products?search=${encodeURIComponent(q)}`);
+      router.push(`/search?q=${encodeURIComponent(q)}`);
       setMobileSearchOpen(false);
     }
   }
@@ -45,14 +45,20 @@ export function Navbar() {
     return pathname.startsWith(path);
   }
 
+  const iconBtn =
+    "p-2 rounded-sm border-2 border-transparent transition-colors";
+  const iconBtnState = (active: boolean) =>
+    active ? "bg-foreground text-background" : "text-muted hover:border-foreground hover:text-foreground";
+
   return (
     <>
-      <nav className="sticky top-0 z-50 border-b border-zinc-200/60 bg-white/95 backdrop-blur-xl">
+      <nav className="sticky top-0 z-50 border-b-2 border-foreground bg-background">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
           {/* ─── Logo ─── */}
-          <Link href="/" className="flex items-center gap-1.5 shrink-0 group">
-            <span className="text-xl font-bold tracking-tight text-amber-600 transition-colors group-hover:text-amber-700">Ailexity</span>
-            <span className="text-lg font-medium text-zinc-500 hidden sm:inline">Market</span>
+          <Link href="/" className="flex items-center gap-2 shrink-0 group">
+            <span className="h-2.5 w-2.5 bg-accent" />
+            <span className="text-xl font-black uppercase tracking-tight text-foreground">Ailexity</span>
+            <span className="text-lg font-medium text-muted hidden sm:inline">Market</span>
           </Link>
 
           {/* ─── Search Bar (Desktop) ─── */}
@@ -60,10 +66,10 @@ export function Navbar() {
             onSubmit={handleSearch}
             className="hidden sm:flex items-center flex-1 max-w-sm mx-6"
           >
-            <div className={`relative w-full transition-all duration-200 ${searchFocused ? "scale-[1.02]" : ""}`}>
+            <div className="relative w-full">
               <svg
                 className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 transition-colors ${
-                  searchFocused ? "text-amber-500" : "text-zinc-400"
+                  searchFocused ? "text-accent" : "text-muted"
                 }`}
                 fill="none"
                 viewBox="0 0 24 24"
@@ -77,10 +83,8 @@ export function Navbar() {
                 placeholder="Search"
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setSearchFocused(false)}
-                className={`w-full rounded-xl py-2 pl-9 pr-4 text-sm bg-zinc-100 placeholder-zinc-400 outline-none transition-all duration-200 ${
-                  searchFocused
-                    ? "bg-white ring-1 ring-zinc-300 shadow-sm placeholder-zinc-500"
-                    : "hover:bg-zinc-200/70"
+                className={`w-full rounded-sm border-2 py-2 pl-9 pr-4 text-sm bg-background placeholder-muted outline-none transition-colors ${
+                  searchFocused ? "border-accent" : "border-foreground/20 hover:border-foreground/40"
                 }`}
               />
             </div>
@@ -90,16 +94,16 @@ export function Navbar() {
           <div className="flex items-center gap-1">
             {loading ? (
               <div className="flex items-center gap-2">
-                <div className="h-6 w-6 rounded-full bg-zinc-200 animate-pulse" />
-                <div className="h-6 w-6 rounded-full bg-zinc-200 animate-pulse" />
-                <div className="h-8 w-8 rounded-full bg-zinc-200 animate-pulse" />
+                <div className="h-6 w-6 rounded-sm bg-line animate-pulse" />
+                <div className="h-6 w-6 rounded-sm bg-line animate-pulse" />
+                <div className="h-8 w-8 rounded-sm bg-line animate-pulse" />
               </div>
             ) : user ? (
               <>
                 {/* Mobile search toggle */}
                 <button
                   onClick={() => setMobileSearchOpen(!mobileSearchOpen)}
-                  className="sm:hidden p-2 rounded-xl text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+                  className={`sm:hidden ${iconBtn} ${iconBtnState(false)}`}
                   aria-label="Search"
                 >
                   <svg className="h-[22px] w-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -110,11 +114,7 @@ export function Navbar() {
                 {/* Home */}
                 <Link
                   href="/"
-                  className={`p-2 rounded-xl transition-colors ${
-                    isActive("/") && pathname === "/"
-                      ? "text-zinc-900"
-                      : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"
-                  }`}
+                  className={`${iconBtn} ${iconBtnState(isActive("/") && pathname === "/")}`}
                   title="Home"
                 >
                   {isActive("/") && pathname === "/" ? (
@@ -131,11 +131,7 @@ export function Navbar() {
                 {/* Discover */}
                 <Link
                   href="/products"
-                  className={`p-2 rounded-xl transition-colors ${
-                    isActive("/products")
-                      ? "text-zinc-900"
-                      : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"
-                  }`}
+                  className={`${iconBtn} ${iconBtnState(isActive("/products"))}`}
                   title="Discover"
                 >
                   {isActive("/products") ? (
@@ -152,11 +148,7 @@ export function Navbar() {
                 {/* Communities */}
                 <Link
                   href="/communities"
-                  className={`p-2 rounded-xl transition-colors ${
-                    isActive("/communities")
-                      ? "text-zinc-900"
-                      : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"
-                  }`}
+                  className={`${iconBtn} ${iconBtnState(isActive("/communities"))}`}
                   title="Communities"
                 >
                   {isActive("/communities") ? (
@@ -170,27 +162,91 @@ export function Navbar() {
                   )}
                 </Link>
 
-                {/* Create / Add new (for sellers) */}
-                {(user.role === "seller" || user.role === "admin") && (
-                  <Link
-                    href="/dashboard/new"
-                    className="p-2 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
-                    title="Create"
-                  >
-                    <svg className="h-[22px] w-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </Link>
-                )}
+                {/* Messages */}
+                <Link
+                  href="/messages"
+                  className={`relative ${iconBtn} ${iconBtnState(isActive("/messages"))}`}
+                  title="Messages"
+                >
+                  <svg className="h-[22px] w-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  {unreadMessageCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-sm border border-foreground bg-accent px-1 text-[10px] font-bold text-background">
+                      {unreadMessageCount > 9 ? "9+" : unreadMessageCount}
+                    </span>
+                  )}
+                </Link>
+
+                {/* Wishlist */}
+                <Link
+                  href="/wishlist"
+                  className={`relative ${iconBtn} ${iconBtnState(isActive("/wishlist"))}`}
+                  title="Saved"
+                >
+                  <svg className="h-[22px] w-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 10-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  {wishlistCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-sm border border-foreground bg-accent px-1 text-[10px] font-bold text-background">
+                      {wishlistCount > 9 ? "9+" : wishlistCount}
+                    </span>
+                  )}
+                </Link>
+
+                {/* Cart */}
+                <Link
+                  href="/cart"
+                  className={`relative ${iconBtn} ${iconBtnState(isActive("/cart"))}`}
+                  title="Cart"
+                >
+                  <svg className="h-[22px] w-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 1.994-4.694 2.602-7.152.078-.316-.145-.598-.472-.598H5.106M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+                  </svg>
+                  {cartCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-sm border border-foreground bg-accent px-1 text-[10px] font-bold text-background">
+                      {cartCount > 9 ? "9+" : cartCount}
+                    </span>
+                  )}
+                </Link>
+
+                {/* Wallet balance */}
+                <Link
+                  href="/business/balances"
+                  title="Wallet balance"
+                  className={`flex items-center gap-1.5 rounded-sm border-2 px-2.5 py-1.5 text-sm font-bold transition-colors ${
+                    isActive("/business/balances")
+                      ? "bg-foreground text-background border-foreground"
+                      : "text-foreground border-transparent hover:border-foreground"
+                  }`}
+                >
+                  <svg className="h-[18px] w-[18px] text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9v3" />
+                  </svg>
+                  <span className="hidden sm:inline font-mono tabular-nums">
+                    {walletBalance === null ? "—" : `$${walletBalance.toFixed(2)}`}
+                  </span>
+                </Link>
+
+                {/* Create / Add new */}
+                <Link
+                  href="/dashboard/new"
+                  className={`${iconBtn} ${iconBtnState(false)}`}
+                  title="Create"
+                >
+                  <svg className="h-[22px] w-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </Link>
 
                 {/* Admin shield */}
                 {user.role === "admin" && (
                   <Link
                     href="/admin"
-                    className={`p-2 rounded-xl transition-colors ${
+                    className={`p-2 rounded-sm border-2 border-transparent transition-colors ${
                       isActive("/admin")
-                        ? "text-rose-600"
-                        : "text-zinc-500 hover:text-rose-600 hover:bg-rose-50"
+                        ? "bg-rose-600 text-white"
+                        : "text-muted hover:border-rose-600 hover:text-rose-600"
                     }`}
                     title="Admin"
                   >
@@ -201,23 +257,23 @@ export function Navbar() {
                 )}
 
                 {/* Divider */}
-                <div className="mx-1 h-6 w-px bg-zinc-200 hidden sm:block" />
+                <div className="mx-1 h-6 w-px bg-line hidden sm:block" />
 
                 {/* Profile avatar + dropdown */}
                 <div className="relative" ref={dropdownRef}>
                   <button
                     onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className={`p-[2px] rounded-full transition-all ${
+                    className={`rounded-sm border-2 p-[2px] transition-colors ${
                       dropdownOpen || isActive("/profile")
-                        ? "ring-2 ring-zinc-900"
-                        : "hover:ring-2 hover:ring-zinc-300"
+                        ? "border-foreground"
+                        : "border-transparent hover:border-foreground/40"
                     }`}
                     aria-label="Profile menu"
                   >
                     {user.avatar ? (
-                      <img src={user.avatar} className="h-7 w-7 rounded-full object-cover" alt="" crossOrigin="anonymous" referrerPolicy="no-referrer" />
+                      <img src={user.avatar} className="h-7 w-7 rounded-sm object-cover" alt="" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                     ) : (
-                      <div className="h-7 w-7 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-xs font-bold text-white">
+                      <div className="h-7 w-7 rounded-sm bg-foreground flex items-center justify-center text-xs font-bold text-background">
                         {user.name?.charAt(0) || "U"}
                       </div>
                     )}
@@ -225,22 +281,22 @@ export function Navbar() {
 
                   {dropdownOpen && (
                     <div
-                      className="absolute right-0 mt-3 w-60 rounded-2xl border border-zinc-200 bg-white py-2 shadow-xl shadow-zinc-200/40 z-50"
+                      className="absolute right-0 mt-3 w-60 rounded-sm border-2 border-foreground bg-background py-2 shadow-hard-ink z-50"
                       style={{ animation: "fadeIn 0.15s ease-out" }}
                     >
                       {/* User info header */}
-                      <div className="px-4 py-3 border-b border-zinc-100">
+                      <div className="px-4 py-3 border-b-2 border-foreground">
                         <div className="flex items-center gap-3">
                           {user.avatar ? (
-                            <img src={user.avatar} className="h-10 w-10 rounded-full object-cover" alt="" crossOrigin="anonymous" referrerPolicy="no-referrer" />
+                            <img src={user.avatar} className="h-10 w-10 rounded-sm object-cover" alt="" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                           ) : (
-                            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-sm font-bold text-white">
+                            <div className="h-10 w-10 rounded-sm bg-foreground flex items-center justify-center text-sm font-bold text-background">
                               {user.name?.charAt(0) || "U"}
                             </div>
                           )}
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-zinc-900 truncate">{user.name}</p>
-                            <p className="text-[11px] text-zinc-500 truncate">{user.email}</p>
+                            <p className="text-sm font-semibold text-foreground truncate">{user.name}</p>
+                            <p className="text-[11px] text-muted truncate font-mono">{user.email}</p>
                           </div>
                         </div>
                       </div>
@@ -249,9 +305,9 @@ export function Navbar() {
                         <Link
                           href="/profile"
                           onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors"
+                          className="group flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-foreground hover:text-background transition-colors"
                         >
-                          <svg className="h-4.5 w-4.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <svg className="h-[18px] w-[18px] text-muted group-hover:text-background" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                           </svg>
                           Profile
@@ -260,9 +316,9 @@ export function Navbar() {
                         <Link
                           href="/dashboard"
                           onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors"
+                          className="group flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-foreground hover:text-background transition-colors"
                         >
-                          <svg className="h-4.5 w-4.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <svg className="h-[18px] w-[18px] text-muted group-hover:text-background" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
                           </svg>
                           Dashboard
@@ -271,16 +327,16 @@ export function Navbar() {
                         <Link
                           href="/library"
                           onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors"
+                          className="group flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-foreground hover:text-background transition-colors"
                         >
-                          <svg className="h-4.5 w-4.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <svg className="h-[18px] w-[18px] text-muted group-hover:text-background" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
                           </svg>
                           My Library
                         </Link>
                       </div>
 
-                      <hr className="my-1 border-zinc-100" />
+                      <hr className="my-1 border-line" />
 
                       <div className="py-1">
                         <button
@@ -288,9 +344,9 @@ export function Navbar() {
                             setDropdownOpen(false);
                             handleLogout();
                           }}
-                          className="flex items-center gap-3 w-full text-left px-4 py-2.5 text-sm text-zinc-700 hover:bg-red-50 hover:text-red-600 transition-colors"
+                          className="group flex items-center gap-3 w-full text-left px-4 py-2.5 text-sm text-foreground hover:bg-red-600 hover:text-white transition-colors"
                         >
-                          <svg className="h-4.5 w-4.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <svg className="h-[18px] w-[18px] text-muted group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
                           </svg>
                           Log out
@@ -305,13 +361,13 @@ export function Navbar() {
               <div className="flex items-center gap-2">
                 <Link
                   href="/login"
-                  className="rounded-xl px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 transition-colors"
+                  className="rounded-sm px-4 py-2 text-sm font-bold text-foreground border-2 border-transparent hover:border-foreground transition-colors"
                 >
                   Log in
                 </Link>
                 <Link
                   href="/register"
-                  className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-2 text-sm font-semibold text-white shadow-sm shadow-amber-200/50 hover:shadow-amber-300/60 hover:from-amber-600 hover:to-orange-600 transition-all active:scale-[0.98]"
+                  className="btn-structural rounded-sm border-2 border-foreground bg-accent px-5 py-2 text-sm font-bold text-background shadow-hard-sm"
                 >
                   Sign up
                 </Link>
@@ -324,12 +380,12 @@ export function Navbar() {
       {/* ─── Mobile search overlay ─── */}
       {mobileSearchOpen && (
         <div
-          className="sm:hidden fixed inset-x-0 top-14 z-40 bg-white border-b border-zinc-200 px-4 py-3 shadow-lg"
+          className="sm:hidden fixed inset-x-0 top-14 z-40 bg-background border-b-2 border-foreground px-4 py-3"
           style={{ animation: "fadeIn 0.12s ease-out" }}
         >
           <form onSubmit={handleSearch} className="relative">
             <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -341,7 +397,7 @@ export function Navbar() {
               type="search"
               placeholder="Search"
               autoFocus
-              className="w-full rounded-xl bg-zinc-100 py-2.5 pl-9 pr-4 text-sm placeholder-zinc-400 outline-none focus:bg-white focus:ring-1 focus:ring-zinc-300"
+              className="w-full rounded-sm border-2 border-foreground/20 bg-background py-2.5 pl-9 pr-4 text-sm placeholder-muted outline-none focus:border-accent"
             />
           </form>
         </div>

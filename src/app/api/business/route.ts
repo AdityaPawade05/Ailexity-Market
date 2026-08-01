@@ -15,6 +15,14 @@ export async function GET(request: Request) {
   }
 
   try {
+    // Location and social links are inherently seller-level (a person's info,
+    // not one product/community's), so they're read from the caller's own
+    // User row rather than the Product/Channel — same fields /api/profile uses.
+    const owner = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { location: true, socialLinks: true },
+    });
+
     if (type === "community") {
       const channel = await prisma.channel.findUnique({
         where: { id },
@@ -22,7 +30,7 @@ export async function GET(request: Request) {
       if (!channel || channel.ownerId !== session.userId) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
-      
+
       return NextResponse.json({
         business: {
           id: channel.id,
@@ -30,8 +38,8 @@ export async function GET(request: Request) {
           bio: channel.description || "",
           avatar: channel.avatarUrl || "",
           coverImageUrl: channel.coverImageUrl || "",
-          location: "",
-          socialLinks: "",
+          location: owner?.location || "",
+          socialLinks: owner?.socialLinks || "",
         }
       });
     } else if (type === "product") {
@@ -49,8 +57,8 @@ export async function GET(request: Request) {
           bio: product.description || "",
           avatar: product.imageUrl || "",
           coverImageUrl: "", // Products usually don't have a giant cover image yet
-          location: "",
-          socialLinks: "",
+          location: owner?.location || "",
+          socialLinks: owner?.socialLinks || "",
         }
       });
     }
@@ -76,9 +84,19 @@ export async function PATCH(request: Request) {
 
   try {
     const body = await request.json();
-    const { name, bio, avatar, coverImageUrl } = body;
+    const { name, bio, avatar, coverImageUrl, location, socialLinks } = body;
 
-    // We don't save location or socialLinks here because they are not on the schema yet.
+    // Location and social links live on the seller's User row, shared across
+    // all of that seller's products/communities (see GET above).
+    if (location !== undefined || socialLinks !== undefined) {
+      await prisma.user.update({
+        where: { id: session.userId },
+        data: {
+          ...(location !== undefined ? { location } : {}),
+          ...(socialLinks !== undefined ? { socialLinks } : {}),
+        },
+      });
+    }
 
     if (type === "community") {
       const channel = await prisma.channel.findUnique({ where: { id } });

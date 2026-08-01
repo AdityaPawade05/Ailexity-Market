@@ -1,25 +1,40 @@
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id            String @id @default(cuid())
-  email         String          @unique
+  id            String  @id @default(cuid())
+  email         String  @unique
   password      String
   name          String
-  role          String // "admin" | "seller" | "buyer"
+  role          String // "admin" | "user"
+
+  googleId      String? @unique
+
+  // Linked external platform identities (set via OAuth2 / bot connect flows)
+  discordUserId      String? @unique
+  discordAccessToken String? // OAuth2 access token with guilds.join scope; enables adding user to a guild
+  telegramUserId     String? @unique
 
   avatar        String?
   coverImageUrl String?
   bio           String?
   location      String?
   socialLinks   String? // JSON string
-  username      String?         @unique
+  username      String? @unique
+
+  emailVerified   Boolean   @default(true)
+  verifyToken     String?   @unique
+  verifyTokenExp  DateTime?
+
+  banned Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -32,18 +47,49 @@ model User {
   likes    Like[]
   comments Comment[]
 
-  following Follow[] @relation("Following")
-  followers Follow[] @relation("Follower")
+  // Follow.follower (relation "Follower") is the user doing the following,
+  // so rows where I am the "Follower" side = accounts I follow, and
+  // rows where I am the "Following" side = my followers.
+  following Follow[] @relation("Follower")
+  followers Follow[] @relation("Following")
 
   channels       Channel[]       @relation("UserChannels")
   channelFollows ChannelFollow[] @relation("UserChannelFollows")
 
   invoices      Invoice[]      @relation("SellerInvoices")
   checkoutLinks CheckoutLink[] @relation("SellerCheckoutLinks")
+
+  discountCodes     DiscountCode[]           @relation("SellerDiscountCodes")
+  affiliateLinks    AffiliateLink[]          @relation("SellerAffiliateLinks")
+  affiliateEarnings AffiliateLink[]          @relation("AffiliateUserLinks")
+  marketingEmails   MarketingEmailCampaign[] @relation("SellerMarketingEmails")
+  marketingCreatives MarketingCreative[]     @relation("SellerMarketingCreatives")
+  marketingSettings  MarketingSettings?       @relation("SellerMarketingSettings")
+
+  sentTeamInvites TeamInvite[] @relation("SentTeamInvites")
+  teamMemberships TeamMember[] @relation("TeamMemberships")
+
+  cartItems     CartItem[]     @relation("UserCartItems")
+  wishlistItems WishlistItem[] @relation("UserWishlistItems")
+  reviews       Review[]       @relation("UserReviews")
+
+  sentDirectMessages     DirectMessage[] @relation("SentDirectMessages")
+  receivedDirectMessages DirectMessage[] @relation("ReceivedDirectMessages")
+
+  wallet Wallet?
+
+  createdCommunities CommunitySubscription[] @relation("CommunitySubscriptions")
+  communityMemberships CommunityMember[] @relation("CommunityMemberships")
+  ownedCommunities Community[] @relation("CreatorCommunities")
+  communityMessages CommunityMessage[] @relation("UserCommunityMessages")
+
+  @@index([email])
+  @@index([username])
+  @@index([role])
 }
 
 model Channel {
-  id            String @id @default(cuid())
+  id            String  @id @default(cuid())
   name          String
   description   String?
   coverImageUrl String?
@@ -59,10 +105,13 @@ model Channel {
   posts          Post[]
   channelFollows ChannelFollow[]
   purchases      Purchase[]
+
+  @@index([ownerId])
+  @@index([category])
 }
 
 model ChannelFollow {
-  id         String @id @default(cuid())
+  id         String   @id @default(cuid())
   followerId String
   channelId  String
   createdAt  DateTime @default(now())
@@ -71,10 +120,12 @@ model ChannelFollow {
   channel  Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
   @@unique([followerId, channelId])
+  @@index([followerId])
+  @@index([channelId])
 }
 
 model Post {
-  id             String @id @default(cuid())
+  id             String  @id @default(cuid())
   content        String
   imageUrl       String?
   attachmentUrl  String?
@@ -88,10 +139,14 @@ model Post {
   channel  Channel?  @relation(fields: [channelId], references: [id])
   likes    Like[]
   comments Comment[]
+
+  @@index([authorId])
+  @@index([channelId])
+  @@index([createdAt])
 }
 
 model Like {
-  id        String @id @default(cuid())
+  id        String   @id @default(cuid())
   userId    String
   postId    String
   createdAt DateTime @default(now())
@@ -100,10 +155,11 @@ model Like {
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@unique([userId, postId])
+  @@index([postId])
 }
 
 model Comment {
-  id             String @id @default(cuid())
+  id             String   @id @default(cuid())
   content        String
   userId         String
   postId         String
@@ -113,10 +169,13 @@ model Comment {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([userId])
 }
 
 model Follow {
-  id          String @id @default(cuid())
+  id          String   @id @default(cuid())
   followerId  String
   followingId String
   createdAt   DateTime @default(now())
@@ -125,10 +184,12 @@ model Follow {
   following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
 
   @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
 }
 
 model Product {
-  id            String @id @default(cuid())
+  id            String   @id @default(cuid())
   title         String
   description   String
   price         Float
@@ -140,7 +201,7 @@ model Product {
   pages         Int?
   courseContent String?
   sellerId      String
-  published     Boolean @default(false)
+  published     Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -148,26 +209,51 @@ model Product {
   purchases     Purchase[]
   invoices      Invoice[]
   checkoutLinks CheckoutLink[]
+  discountCodes  DiscountCode[]
+  affiliateLinks AffiliateLink[]
+  cartItems      CartItem[]     @relation("ProductCartItems")
+  wishlistItems  WishlistItem[] @relation("ProductWishlistItems")
+  reviews        Review[]
+
+  @@index([sellerId])
+  @@index([type])
+  @@index([published])
+  @@index([createdAt])
 }
 
 model Purchase {
-  id         String @id @default(cuid())
-  buyerId    String
-  sellerId   String
-  productId  String?
-  channelId  String?
-  amount     Float
-  referredBy String?
-  createdAt  DateTime @default(now())
+  id               String   @id @default(cuid())
+  buyerId          String
+  sellerId         String
+  productId        String?
+  channelId        String?
+  amount           Float
+  commissionAmount Float    @default(0)
+  sellerEarning    Float    @default(0)
+  referredBy       String?
+  discountCodeId   String?
+  discountAmount   Float    @default(0)
+  affiliateLinkId  String?
+  createdAt        DateTime @default(now())
+
+  refunded          Boolean   @default(false)
+  refundedAt        DateTime?
+  refundReason      String?
+  refundRequestedAt DateTime? // buyer-submitted request awaiting seller/admin review; null = none pending
 
   buyer   User     @relation("BuyerPurchases", fields: [buyerId], references: [id], onDelete: Cascade)
   seller  User     @relation("SellerSales", fields: [sellerId], references: [id], onDelete: Cascade)
   product Product? @relation(fields: [productId], references: [id])
   channel Channel? @relation(fields: [channelId], references: [id])
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([productId])
+  @@index([createdAt])
 }
 
 model Invoice {
-  id            String @id @default(cuid())
+  id            String   @id @default(cuid())
   amount        Float
   status        String // "pending" | "paid" | "overdue" | "cancelled"
   dueDate       DateTime
@@ -181,10 +267,14 @@ model Invoice {
 
   seller  User     @relation("SellerInvoices", fields: [sellerId], references: [id], onDelete: Cascade)
   product Product? @relation(fields: [productId], references: [id])
+
+  @@index([sellerId])
+  @@index([status])
+  @@index([dueDate])
 }
 
 model CheckoutLink {
-  id        String @id @default(cuid())
+  id        String   @id @default(cuid())
   title     String
   amount    Float
   sellerId  String
@@ -195,4 +285,362 @@ model CheckoutLink {
 
   seller  User     @relation("SellerCheckoutLinks", fields: [sellerId], references: [id], onDelete: Cascade)
   product Product? @relation(fields: [productId], references: [id])
+
+  @@index([sellerId])
+  @@index([status])
+}
+
+model DiscountCode {
+  id             String    @id @default(cuid())
+  code           String
+  sellerId       String
+  productId      String? // null = applies to all of the seller's products
+  type           String // "PERCENT" | "FIXED"
+  value          Float // percent 1-100, or a fixed dollar amount
+  maxRedemptions Int?
+  timesRedeemed  Int       @default(0)
+  active         Boolean   @default(true)
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  seller  User     @relation("SellerDiscountCodes", fields: [sellerId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+
+  @@unique([sellerId, code])
+  @@index([productId])
+}
+
+model AffiliateLink {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  sellerId        String
+  productId       String
+  affiliateUserId String? // null = tracking-only, no payout
+  commissionRate  Float    @default(0.10)
+  clicks          Int      @default(0)
+  conversions     Int      @default(0)
+  totalEarned     Float    @default(0)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  seller        User     @relation("SellerAffiliateLinks", fields: [sellerId], references: [id], onDelete: Cascade)
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  affiliateUser User?    @relation("AffiliateUserLinks", fields: [affiliateUserId], references: [id])
+
+  @@index([productId])
+  @@index([affiliateUserId])
+}
+
+model MarketingEmailCampaign {
+  id             String   @id @default(cuid())
+  sellerId       String
+  subject        String
+  message        String
+  recipientCount Int
+  createdAt      DateTime @default(now())
+
+  seller User @relation("SellerMarketingEmails", fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId])
+}
+
+model MarketingCreative {
+  id        String   @id @default(cuid())
+  sellerId  String
+  name      String
+  assetUrl  String?
+  createdAt DateTime @default(now())
+
+  seller User @relation("SellerMarketingCreatives", fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId])
+}
+
+// Singleton row per seller for marketing tool preferences (audience targeting,
+// connected ad platforms). Created lazily on first read, same as Wallet.
+model MarketingSettings {
+  id                 String   @id @default(cuid())
+  sellerId           String   @unique
+  audiencePreset     String   @default("All buyers")
+  facebookConnected  Boolean  @default(false)
+  googleConnected    Boolean  @default(false)
+  instagramConnected Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  seller User @relation("SellerMarketingSettings", fields: [sellerId], references: [id], onDelete: Cascade)
+}
+
+// A pending invite to join a product or community's team. businessType/businessId
+// point at either a Product or a Channel (no FK, since it's polymorphic).
+model TeamInvite {
+  id           String    @id @default(cuid())
+  ownerId      String
+  businessType String // "product" | "community"
+  businessId   String
+  email        String?
+  token        String    @unique
+  status       String    @default("pending") // "pending" | "accepted" | "revoked"
+  createdAt    DateTime  @default(now())
+  acceptedAt   DateTime?
+
+  owner User @relation("SentTeamInvites", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([businessType, businessId])
+}
+
+model TeamMember {
+  id           String   @id @default(cuid())
+  businessType String // "product" | "community"
+  businessId   String
+  userId       String
+  role         String   @default("member")
+  createdAt    DateTime @default(now())
+
+  user User @relation("TeamMemberships", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([businessType, businessId, userId])
+  @@index([businessType, businessId])
+}
+
+// One row per (user, product) they've added to their cart — a product can
+// only be in a given user's cart once (no quantity: digital goods, one copy).
+model CartItem {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation("UserCartItems", fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation("ProductCartItems", fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+}
+
+// One row per (user, product) saved for later — a bookmark, not a purchase
+// intent; unlike CartItem, saving something you already own isn't blocked.
+model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation("UserWishlistItems", fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation("ProductWishlistItems", fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+}
+
+// A verified-purchase review — one per (product, user). Requires the user to
+// own a real Purchase of the product before the API will let them write one.
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  userId    String
+  rating    Int // 1-5
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation("UserReviews", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId])
+  @@index([productId])
+  @@index([userId])
+}
+
+// A 1:1 direct message. There's no separate Conversation entity — the thread
+// between two users is implicit (all rows where {sender,recipient} match that
+// pair in either direction), same minimal-junction style as Follow.
+model DirectMessage {
+  id          String   @id @default(cuid())
+  senderId    String
+  recipientId String
+  content     String
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  sender    User @relation("SentDirectMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User @relation("ReceivedDirectMessages", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([recipientId])
+  @@index([senderId, recipientId])
+}
+
+model Wallet {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  balance   Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+
+  @@index([userId])
+}
+
+model WalletTransaction {
+  id          String   @id @default(cuid())
+  walletId    String
+  type        String   // "DEPOSIT" | "WITHDRAWAL" | "PURCHASE_DEBIT" | "SALE_CREDIT"
+  amount      Float
+  description String?
+  purchaseId  String?
+  createdAt   DateTime @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId])
+  @@index([createdAt])
+}
+
+// Singleton row (id = "platform") that accumulates Ailexity commission
+model PlatformWallet {
+  id        String   @id @default(cuid())
+  balance   Float    @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model Community {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  avatarUrl     String?
+  coverImageUrl String?
+  category      String? // e.g., "trading", "fitness", "business", "AI tools"
+
+  createrId     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  creator           User                   @relation("CreatorCommunities", fields: [createrId], references: [id], onDelete: Cascade)
+  tiers             SubscriptionTier[]
+  members           CommunityMember[]
+  discordConfig     DiscordIntegration?
+  telegramConfig    TelegramIntegration?
+  subscriptions     CommunitySubscription[]
+  messages          CommunityMessage[]
+
+  @@index([createrId])
+  @@index([category])
+  @@index([createdAt])
+}
+
+model SubscriptionTier {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Free", "Basic", "VIP"
+  description String?
+  price       Float    // Monthly price in cents (0 for free tier)
+  interval    String   @default("month") // "month" | "year" | "lifetime"
+  features    String?  // JSON array of feature strings
+  memberLimit Int?     // null = unlimited
+
+  // Per-tier access mapping. Falls back to the community-wide DiscordIntegration
+  // managedRoleId / TelegramIntegration when not set.
+  discordRoleId     String? // Discord role granted to subscribers of THIS tier
+  telegramChannelId String? // optional per-tier Telegram channel
+
+  communityId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  community      Community               @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  subscriptions  CommunitySubscription[]
+
+  @@index([communityId])
+}
+
+model CommunitySubscription {
+  id           String   @id @default(cuid())
+  memberId     String
+  tierId       String
+  communityId  String
+
+  status       String   @default("active") // "active" | "cancelled" | "expired"
+  startedAt    DateTime @default(now())
+  expiresAt    DateTime? // null for lifetime
+  cancelledAt  DateTime?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  member    User              @relation("CommunitySubscriptions", fields: [memberId], references: [id], onDelete: Cascade)
+  tier      SubscriptionTier  @relation(fields: [tierId], references: [id], onDelete: Cascade)
+  community Community         @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, communityId])
+  @@index([memberId])
+  @@index([communityId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model CommunityMember {
+  id          String   @id @default(cuid())
+  memberId    String
+  communityId String
+
+  joinedAt    DateTime @default(now())
+
+  member    User      @relation("CommunityMemberships", fields: [memberId], references: [id], onDelete: Cascade)
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, communityId])
+  @@index([memberId])
+  @@index([communityId])
+}
+
+// In-app community room: a single members-only chat feed per community.
+// Posting/reading is gated to active subscribers and the community creator.
+model CommunityMessage {
+  id          String   @id @default(cuid())
+  communityId String
+  authorId    String
+  content     String
+  createdAt   DateTime @default(now())
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  author    User      @relation("UserCommunityMessages", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([communityId, createdAt])
+  @@index([authorId])
+}
+
+model DiscordIntegration {
+  id              String   @id @default(cuid())
+  communityId     String   @unique
+  serverId        String   // Discord server/guild ID
+  botToken        String   // Encrypted in production
+  managedRoleId   String?  // Role ID that bot assigns to paid members
+  managedChannelId String?  // Channel ID for exclusive content
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@index([communityId])
+}
+
+model TelegramIntegration {
+  id              String   @id @default(cuid())
+  communityId     String   @unique
+  groupId         String   // Telegram group ID
+  botToken        String   // Encrypted in production
+  managedChannelId String?  // Channel ID for exclusive content
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@index([communityId])
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useCallback, useEffect, useState, Suspense } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useSearchParams } from "next/navigation";
 
@@ -25,13 +25,12 @@ function CheckoutContent() {
     amount: "",
   });
 
-  const fetchLinks = () => {
+  const fetchLinks = useCallback(() => {
     if (user) {
-      setLoading(true);
-      const url = productId 
-        ? `/api/checkout?productId=${productId}` 
+      const url = productId
+        ? `/api/checkout?productId=${productId}`
         : "/api/checkout";
-      
+
       fetch(url)
         .then(async (r) => {
           if (!r.ok) {
@@ -40,15 +39,15 @@ function CheckoutContent() {
           }
           return r.json();
         })
-        .then((s) => setLinks(s))
+        .then((s) => setLinks(Array.isArray(s) ? s : []))
         .catch(console.error)
         .finally(() => setLoading(false));
     }
-  };
+  }, [user, productId]);
 
   useEffect(() => {
     fetchLinks();
-  }, [user, productId]);
+  }, [fetchLinks]);
 
   const handleCreateLink = async (e: React.FormEvent) => {
     e.preventDefault();

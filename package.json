@@ -7,9 +7,16 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "npx tsx prisma/seed.ts",
-    "postinstall": "prisma generate"
+    "db:studio": "prisma studio",
+    "postinstall": "prisma generate",
+    "test": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:all": "vitest run"
   },
   "dependencies": {
     "@prisma/client": "5.22.0",
@@ -19,7 +26,8 @@
     "nodemailer": "^8.0.5",
     "prisma": "5.22.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "recharts": "^3.9.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -28,9 +36,11 @@
     "@types/nodemailer": "^8.0.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }

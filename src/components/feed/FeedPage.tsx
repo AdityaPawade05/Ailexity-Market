@@ -10,6 +10,8 @@ type Post = {
   id: string;
   content: string;
   imageUrl: string | null;
+  attachmentUrl?: string | null;
+  attachmentType?: string | null;
   createdAt: string;
   author: { id: string; name: string; avatar: string | null; bio: string | null };
   liked: boolean;

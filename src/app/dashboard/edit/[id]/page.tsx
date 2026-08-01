@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { uploadFile } from "@/lib/upload";
 
 type Product = {
   id: string;
@@ -215,21 +216,22 @@ export default function EditProductPage() {
               <input
                 type="file"
                 accept=".pdf,.zip,.mp4"
-                onChange={(e) => {
+                onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  const reader = new FileReader();
-                  reader.onloadend = () => {
-                    setForm({ ...form, fileUrl: reader.result as string });
-                  };
-                  reader.readAsDataURL(file);
+                  try {
+                    const url = await uploadFile(file, "product");
+                    setForm((prev) => ({ ...prev, fileUrl: url }));
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "File upload failed");
+                  }
                 }}
                 className="w-full cursor-pointer rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-2.5 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-amber-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-amber-700 hover:file:bg-amber-200"
               />
-              {form.fileUrl?.startsWith('data:') && (
+              {form.fileUrl && !form.fileUrl.startsWith("http") && !form.fileUrl.startsWith("data:") && (
                 <span className="text-xs font-semibold text-green-600 flex items-center gap-1">
                   <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                  File encoded and ready for upload
+                  File uploaded successfully
                 </span>
               )}
             </div>
@@ -259,21 +261,22 @@ export default function EditProductPage() {
               <input
                 type="file"
                 accept="audio/*"
-                onChange={(e) => {
+                onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  const reader = new FileReader();
-                  reader.onloadend = () => {
-                    setForm({ ...form, audioUrl: reader.result as string });
-                  };
-                  reader.readAsDataURL(file);
+                  try {
+                    const url = await uploadFile(file, "audio");
+                    setForm((prev) => ({ ...prev, audioUrl: url }));
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "Audio upload failed");
+                  }
                 }}
                 className="w-full cursor-pointer rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-2.5 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-amber-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-amber-700 hover:file:bg-amber-200"
               />
-              {form.audioUrl?.startsWith('data:') && (
+              {form.audioUrl && !form.audioUrl.startsWith("http") && !form.audioUrl.startsWith("data:") && (
                 <span className="text-xs font-semibold text-green-600 flex items-center gap-1">
                   <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                  Audio encoded and ready for upload
+                  Audio uploaded successfully
                 </span>
               )}
             </div>

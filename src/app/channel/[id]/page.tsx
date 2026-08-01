@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import { useAuth } from "@/context/AuthContext";
 import { PostCard } from "@/components/feed/PostCard";
+import { uploadFile } from "@/lib/upload";
 
 type Channel = {
   id: string;
@@ -38,7 +39,7 @@ type Post = {
 export default function ChannelPage() {
   const params = useParams();
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading, walletBalance, refreshWallet } = useAuth();
 
   const channelId = String(params.id || "");
   const [channel, setChannel] = useState<Channel | null>(null);
@@ -116,9 +117,10 @@ export default function ChannelPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Purchase failed");
-      
+
       setFollowing(true);
       fetchChannel();
+      await refreshWallet();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Failed to join community");
     } finally {
@@ -256,10 +258,20 @@ export default function ChannelPage() {
         </div>
       </div>
 
+      {!following && user.id !== channel?.owner.id && channel?.price > 0 && walletBalance !== null && walletBalance < channel.price && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          ⚠️ Your wallet balance (${walletBalance.toFixed(2)}) is below the price to join this community (${channel.price.toFixed(2)}).{" "}
+          <Link href="/business/balances" className="font-semibold underline hover:text-amber-900">
+            Top up your wallet
+          </Link>{" "}
+          to join.
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         <div className="relative h-40 w-full bg-gradient-to-r from-amber-100 via-orange-50 to-zinc-50">
           {channel.coverImageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
+             
             <img src={channel.coverImageUrl} alt="" className="h-full w-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
           ) : null}
         </div>
@@ -268,7 +280,7 @@ export default function ChannelPage() {
             <div className="relative inline-block">
               <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-amber-100 shadow-sm">
                 {channel.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
+                   
                   <img src={channel.avatarUrl} alt="" className="h-full w-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                 ) : (
                   <div className="text-3xl font-bold text-amber-800">
@@ -377,14 +389,15 @@ export default function ChannelPage() {
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setPostImageUrl(reader.result as string);
-                        };
-                        reader.readAsDataURL(file);
+                        try {
+                          const url = await uploadFile(file, "image");
+                          setPostImageUrl(url);
+                        } catch {
+                          // ignore silently; user can try again
+                        }
                         e.target.value = "";
                       }}
                       className="hidden"
@@ -489,9 +502,9 @@ export default function ChannelPage() {
               {chatAttachmentUrl ? (
                 <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2 text-sm shadow-sm">
                   <span className="truncate text-zinc-600 max-w-[80%]">
-                    {chatAttachmentUrl.startsWith("data:") 
-                      ? `File attached (${chatAttachmentType || "Unknown"})` 
-                      : `URL attached: ${chatAttachmentUrl}`}
+                    {chatAttachmentUrl.startsWith("/uploads/")
+                      ? `File attached (${chatAttachmentType || "file"})`
+                      : `URL: ${chatAttachmentUrl}`}
                   </span>
                   <button
                     type="button"
@@ -512,15 +525,17 @@ export default function ChannelPage() {
                   </svg>
                   <input
                     type="file"
-                    onChange={(e) => {
+                    accept="image/*,.pdf"
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
-                      setChatAttachmentType(file.type);
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        setChatAttachmentUrl(reader.result as string);
-                      };
-                      reader.readAsDataURL(file);
+                      try {
+                        const url = await uploadFile(file, "chat");
+                        setChatAttachmentUrl(url);
+                        setChatAttachmentType(file.type);
+                      } catch {
+                        // ignore silently; user can try again
+                      }
                       e.target.value = "";
                     }}
                     className="hidden"

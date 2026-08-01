@@ -1,23 +1,64 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fafafa;
-  --foreground: #171717;
-  --accent: #d97706;
-  --accent-hover: #b45309;
+  --background: #ffffff;
+  --foreground: #111112;
+  --muted: #4c4c50;
+  --line: rgba(17, 17, 18, 0.09);
+  --accent: #ff5a24;
+  --accent-hover: #e34c1a;
+  --accent-2: #ffd23f;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-2: var(--accent-2);
   --font-sans: var(--font-outfit), system-ui, sans-serif;
   --font-mono: var(--font-mono), monospace;
+  --shadow-hard-xs: 3px 3px 0 0 var(--accent);
+  --shadow-hard-sm: 4px 4px 0 0 var(--accent);
+  --shadow-hard: 6px 6px 0 0 var(--accent);
+  --shadow-hard-lg: 9px 9px 0 0 var(--foreground);
+  --shadow-hard-ink: 6px 6px 0 0 var(--foreground);
 }
 
 body {
-  background: var(--background);
+  background:
+    repeating-linear-gradient(0deg, var(--line) 0 1px, transparent 1px 44px),
+    repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px 44px),
+    var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+/* ═══════════════════════════════════════════════════
+   Structural UI — shared primitives
+   Flat paper, thick ink borders, one flat accent,
+   hard offset shadows that press flat on hover.
+   ═══════════════════════════════════════════════════ */
+
+.btn-structural {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.btn-structural:hover {
+  transform: translate(-2px, -2px);
+}
+.btn-structural:active {
+  transform: translate(0, 0);
+  box-shadow: none !important;
+}
+
+.card-structural {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.card-structural:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-hard-ink);
 }
 
 @keyframes modalSlideUp {

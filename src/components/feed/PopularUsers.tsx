@@ -41,7 +41,7 @@ export function PopularUsers() {
   return (
     <div className="sticky top-24 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
       <h3 className="font-semibold text-zinc-900">Popular users</h3>
-      <Link href="/products" className="mt-1 block text-sm text-amber-600 hover:text-amber-700">
+      <Link href="/search?tab=users" className="mt-1 block text-sm text-amber-600 hover:text-amber-700">
         See all
       </Link>
       <div className="mt-4 space-y-3">
@@ -52,7 +52,7 @@ export function PopularUsers() {
                 <div className="relative">
                   <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-amber-100">
                     {user.avatar ? (
-                      // eslint-disable-next-line @next/next/no-img-element
+                       
                       <img src={user.avatar} alt="" className="h-full w-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                     ) : (
                       <span className="text-lg font-semibold text-amber-800">

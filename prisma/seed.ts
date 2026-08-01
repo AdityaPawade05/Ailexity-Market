@@ -15,6 +15,7 @@ async function main() {
         password: adminPassword,
         name: "Admin",
         role: "admin",
+        emailVerified: true,
       },
     });
   } else {
@@ -24,6 +25,7 @@ async function main() {
         password: adminPassword,
         name: "Admin",
         role: "admin",
+        emailVerified: true,
       },
     });
   }
@@ -39,7 +41,8 @@ async function main() {
         email: "seller@ailexity.com",
         password: sellerPassword,
         name: "Sample Seller",
-        role: "seller",
+        role: "user",
+        emailVerified: true,
       },
     });
   } else {
@@ -48,7 +51,8 @@ async function main() {
       data: {
         password: sellerPassword,
         name: "Sample Seller",
-        role: "seller",
+        role: "user",
+        emailVerified: true,
       },
     });
   }
@@ -63,7 +67,8 @@ async function main() {
         email: "buyer@ailexity.com",
         password: await bcrypt.hash("buyer123", 12),
         name: "Sample Buyer",
-        role: "buyer",
+        role: "user",
+        emailVerified: true,
       },
     });
   } else {
@@ -72,7 +77,8 @@ async function main() {
       data: {
         password: await bcrypt.hash("buyer123", 12),
         name: "Sample Buyer",
-        role: "buyer",
+        role: "user",
+        emailVerified: true,
       },
     });
   }
@@ -88,7 +94,8 @@ async function main() {
         email: "aditya@ailexity.com",
         password: adityaPassword,
         name: "Aditya Pawade",
-        role: "seller",
+        role: "user",
+        emailVerified: true,
       },
     });
   } else {
@@ -97,7 +104,8 @@ async function main() {
       data: {
         password: adityaPassword,
         name: "Aditya Pawade",
-        role: "seller",
+        role: "user",
+        emailVerified: true,
       },
     });
   }
@@ -113,7 +121,8 @@ async function main() {
         email: "peter@ailexity.com",
         password: peterPassword,
         name: "Peter Parker",
-        role: "buyer",
+        role: "user",
+        emailVerified: true,
       },
     });
   } else {
@@ -122,7 +131,8 @@ async function main() {
       data: {
         password: peterPassword,
         name: "Peter Parker",
-        role: "buyer",
+        role: "user",
+        emailVerified: true,
       },
     });
   }

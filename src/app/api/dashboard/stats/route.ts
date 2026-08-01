@@ -4,14 +4,14 @@ import { getSession } from "@/lib/auth";
 
 export async function GET(request: Request) {
   const session = await getSession();
-  if (!session || !["admin", "seller", "buyer", "user"].includes(session.role)) {
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { searchParams } = new URL(request.url);
   const productId = searchParams.get("productId");
   const channelId = searchParams.get("channelId");
-  
+
   let targetSellerId = session.userId;
   if (session.role === "admin") {
     if (productId) {
@@ -23,7 +23,10 @@ export async function GET(request: Request) {
     }
   }
 
-  const purchaseWhere: any = { sellerId: targetSellerId };
+  const purchaseWhere: { sellerId: string; productId?: string; channelId?: string; refunded: boolean } = {
+    sellerId: targetSellerId,
+    refunded: false,
+  };
   if (productId) purchaseWhere.productId = productId;
   if (channelId) purchaseWhere.channelId = channelId;
 
@@ -32,9 +35,7 @@ export async function GET(request: Request) {
       where: purchaseWhere,
       _sum: { amount: true },
     }),
-    prisma.purchase.count({
-      where: purchaseWhere,
-    }),
+    prisma.purchase.count({ where: purchaseWhere }),
     prisma.product.count({
       where: { sellerId: session.userId, published: true, ...(productId ? { id: productId } : {}) },
     }),
@@ -46,8 +47,8 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     totalRevenue: totalRevenue._sum.amount ?? 0,
-    totalSales: totalSales,
-    productsLive: productsLive,
+    totalSales,
+    productsLive,
     customers: customersCount,
   });
 }

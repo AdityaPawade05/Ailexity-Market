@@ -11,6 +11,12 @@ export type ChatMessage = {
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
+// Verbose progress logs (retries/fallbacks) are dev-only noise; real failures
+// still go through console.error/console.warn regardless of environment.
+const debugLog = (...args: unknown[]) => {
+  if (process.env.NODE_ENV !== "production") console.log(...args);
+};
+
 const SYSTEM_PROMPT = `You are Ailexity Market's AI assistant — a friendly, knowledgeable helper for a digital marketplace that sells ebooks, courses, and SaaS products.
 
 Your capabilities:
@@ -104,7 +110,7 @@ async function callGeminiModel(
         // Use default delay
       }
 
-      console.log(
+      debugLog(
         `[AI] ${model} rate limited (attempt ${attempt + 1}/${retries + 1}), waiting ${delayMs}ms...`
       );
       await sleep(delayMs);
@@ -126,7 +132,7 @@ async function callGemini(messages: ChatMessage[]): Promise<string> {
 
   for (const model of GEMINI_MODELS) {
     try {
-      console.log(`[AI] Trying ${model}...`);
+      debugLog(`[AI] Trying ${model}...`);
       return await callGeminiModel(model, messages, 1);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -182,7 +188,7 @@ export async function callAI(messages: ChatMessage[]): Promise<string> {
 
       // Try OpenAI fallback if available
       if (OPENAI_API_KEY) {
-        console.log("[AI] Trying OpenAI fallback...");
+        debugLog("[AI] Trying OpenAI fallback...");
         return await callOpenAI(messages);
       }
 

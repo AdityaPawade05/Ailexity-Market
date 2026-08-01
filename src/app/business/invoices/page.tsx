@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useCallback, useEffect, useState, Suspense } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useSearchParams } from "next/navigation";
 
@@ -31,13 +31,12 @@ function InvoicesContent() {
     dueDate: "",
   });
 
-  const fetchInvoices = () => {
+  const fetchInvoices = useCallback(() => {
     if (user) {
-      setLoading(true);
-      const url = productId 
-        ? `/api/invoices?productId=${productId}` 
+      const url = productId
+        ? `/api/invoices?productId=${productId}`
         : "/api/invoices";
-      
+
       fetch(url)
         .then(async (r) => {
           if (!r.ok) {
@@ -46,15 +45,15 @@ function InvoicesContent() {
           }
           return r.json();
         })
-        .then((s) => setInvoices(s))
+        .then((s) => setInvoices(Array.isArray(s) ? s : []))
         .catch(console.error)
         .finally(() => setLoading(false));
     }
-  };
+  }, [user, productId]);
 
   useEffect(() => {
     fetchInvoices();
-  }, [user, productId]);
+  }, [fetchInvoices]);
 
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();

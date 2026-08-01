@@ -4,6 +4,8 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ProductCard } from "@/components/ProductCard";
 
+type Filters = { search: string; minPrice: string; maxPrice: string };
+
 type Product = {
   id: string;
   title: string;
@@ -17,35 +19,123 @@ type Product = {
   _count?: { purchases: number };
 };
 
+const SORT_OPTIONS = [
+  { value: "popular", label: "Most popular" },
+  { value: "newest", label: "Newest" },
+  { value: "price_asc", label: "Price: Low to High" },
+  { value: "price_desc", label: "Price: High to Low" },
+];
+
+// Local input state initialized once from `initial` — keying this component
+// by the URL values (see usage below) resets it on navigation instead of
+// syncing via an effect.
+function FilterForm({
+  initial,
+  sort,
+  onSortChange,
+  onSubmit,
+}: {
+  initial: Filters;
+  sort: string;
+  onSortChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  onSubmit: (filters: Filters) => void;
+}) {
+  const [filters, setFilters] = useState(initial);
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit(filters);
+      }}
+      className="mt-4 flex flex-wrap gap-2"
+    >
+      <input
+        type="search"
+        value={filters.search}
+        onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+        placeholder="Search products..."
+        className="min-w-[200px] flex-1 rounded-lg border border-zinc-300 px-4 py-2 focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+      />
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        value={filters.minPrice}
+        onChange={(e) => setFilters((f) => ({ ...f, minPrice: e.target.value }))}
+        placeholder="Min $"
+        className="w-24 rounded-lg border border-zinc-300 px-3 py-2 focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+      />
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        value={filters.maxPrice}
+        onChange={(e) => setFilters((f) => ({ ...f, maxPrice: e.target.value }))}
+        placeholder="Max $"
+        className="w-24 rounded-lg border border-zinc-300 px-3 py-2 focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+      />
+      <select
+        value={sort}
+        onChange={onSortChange}
+        className="rounded-lg border border-zinc-300 px-3 py-2 text-zinc-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+      >
+        {SORT_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+      <button
+        type="submit"
+        className="rounded-lg bg-amber-500 px-4 py-2 font-medium text-white hover:bg-amber-600"
+      >
+        Search
+      </button>
+    </form>
+  );
+}
+
 function ProductsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const type = searchParams.get("type") || "";
   const search = searchParams.get("search") || "";
+  const minPrice = searchParams.get("minPrice") || "";
+  const maxPrice = searchParams.get("maxPrice") || "";
+  const sort = searchParams.get("sort") || "popular";
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchInput, setSearchInput] = useState(search);
-
-  useEffect(() => {
-    setSearchInput(search);
-  }, [search]);
 
   useEffect(() => {
     const params = new URLSearchParams();
     if (type) params.set("type", type);
     if (search) params.set("search", search);
+    if (minPrice) params.set("minPrice", minPrice);
+    if (maxPrice) params.set("maxPrice", maxPrice);
+    if (sort && sort !== "popular") params.set("sort", sort);
     fetch(`/api/products?${params}`)
       .then((res) => res.json())
       .then(setProducts)
       .finally(() => setLoading(false));
-  }, [type, search]);
+  }, [type, search, minPrice, maxPrice, sort]);
 
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
+  function buildParams(overrides: Partial<Filters & { sort: string }>) {
     const params = new URLSearchParams();
-    if (type) params.set("type", type);
-    if (searchInput.trim()) params.set("search", searchInput.trim());
-    router.push(`/products?${params}`);
+    const values = { type, search, minPrice, maxPrice, sort, ...overrides };
+    if (values.type) params.set("type", values.type);
+    if (values.search) params.set("search", values.search);
+    if (values.minPrice) params.set("minPrice", values.minPrice);
+    if (values.maxPrice) params.set("maxPrice", values.maxPrice);
+    if (values.sort && values.sort !== "popular") params.set("sort", values.sort);
+    return params;
+  }
+
+  function handleFilterSubmit(filters: Filters) {
+    router.push(`/products?${buildParams({ search: filters.search.trim(), minPrice: filters.minPrice.trim(), maxPrice: filters.maxPrice.trim() })}`);
+  }
+
+  function handleSortChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    router.push(`/products?${buildParams({ sort: e.target.value })}`);
   }
 
   return (
@@ -59,21 +149,13 @@ function ProductsContent() {
             ? `Browse our ${type}s from expert creators`
             : "Explore ebooks and courses to grow your skills"}
         </p>
-        <form onSubmit={handleSearch} className="mt-4 flex gap-2">
-          <input
-            type="search"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search products..."
-            className="flex-1 rounded-lg border border-zinc-300 px-4 py-2 focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
-          />
-          <button
-            type="submit"
-            className="rounded-lg bg-amber-500 px-4 py-2 font-medium text-white hover:bg-amber-600"
-          >
-            Search
-          </button>
-        </form>
+        <FilterForm
+          key={`${search}|${minPrice}|${maxPrice}`}
+          initial={{ search, minPrice, maxPrice }}
+          sort={sort}
+          onSortChange={handleSortChange}
+          onSubmit={handleFilterSubmit}
+        />
       </div>
 
       {loading ? (

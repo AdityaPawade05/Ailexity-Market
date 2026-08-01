@@ -42,7 +42,7 @@ export function FollowListModal({ isOpen, onClose, profileId, type, onFollowTogg
 
   if (!isOpen) return null;
 
-  async function handleToggleFollow(targetId: string, currentlyFollowing: boolean) {
+  async function handleToggleFollow(targetId: string) {
     if (!user) {
       alert("Please log in to perform this action.");
       return;
@@ -117,7 +117,7 @@ export function FollowListModal({ isOpen, onClose, profileId, type, onFollowTogg
 
                   {user?.id !== u.id && (
                     <button
-                      onClick={() => handleToggleFollow(u.id, u.isFollowing)}
+                      onClick={() => handleToggleFollow(u.id)}
                       disabled={processingId === u.id}
                       className={`shrink-0 rounded-lg px-4 py-1.5 text-xs font-semibold tracking-wide transition-all ${
                         u.isFollowing 

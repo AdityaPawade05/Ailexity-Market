@@ -85,8 +85,8 @@ export default function PublicProfilePage() {
     return profile.username || toHandle(profile.name);
   }, [profile]);
 
-  const isVerified = profile?.role === "seller" || profile?.role === "admin";
-  const canCreateChannel = !!user && (user.role === "seller" || user.role === "admin") && user.id === profileId;
+  const isVerified = profile?.role === "admin" || products.length > 0;
+  const canCreateChannel = !!user && user.id === profileId;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -206,8 +206,8 @@ export default function PublicProfilePage() {
   const roleLabel =
     profile.role === "admin"
       ? "Admin"
-      : profile.role === "seller"
-        ? "Digital Creator"
+      : products.length > 0
+        ? "Creator"
         : "Member";
 
   return (
@@ -227,7 +227,7 @@ export default function PublicProfilePage() {
               >
                 <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-full overflow-hidden bg-white ring-[3px] ring-white">
                   {profile.avatar ? (
-                    // eslint-disable-next-line @next/next/no-img-element
+                     
                     <img
                       src={profile.avatar}
                       alt=""
@@ -294,7 +294,7 @@ export default function PublicProfilePage() {
                 </svg>
                 Joined {new Date(stats.joinedAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
               </span>
-              {(profile.role === "seller" || profile.role === "admin") && stats.earned > 0 && (
+              {stats.earned > 0 && (
                 <span className="flex items-center gap-1 text-amber-600 font-medium">
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -343,13 +343,12 @@ export default function PublicProfilePage() {
                     "Follow"
                   )}
                 </button>
-                <button
-                  disabled
-                  className="flex-1 rounded-lg bg-zinc-100 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-200 active:scale-[0.98] transition-all disabled:opacity-70"
-                  title="Messaging coming soon"
+                <Link
+                  href={`/messages/${profileId}`}
+                  className="flex-1 rounded-lg bg-zinc-100 py-2 text-center text-sm font-semibold text-zinc-800 hover:bg-zinc-200 active:scale-[0.98] transition-all"
                 >
                   Message
-                </button>
+                </Link>
                 <button
                   onClick={handleShareProfile}
                   className="rounded-lg bg-zinc-100 p-2 text-zinc-600 hover:bg-zinc-200 active:scale-[0.98] transition-all shrink-0"
@@ -391,7 +390,7 @@ export default function PublicProfilePage() {
             ] as const).map(([key, icon, label]) => (
               <button
                 key={key}
-                onClick={() => setTab(key as any)}
+                onClick={() => setTab(key)}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold tracking-wide uppercase transition-all border-b-2 ${
                   tab === key
                     ? "border-amber-500 text-amber-700 bg-amber-50/30"
@@ -437,7 +436,7 @@ export default function PublicProfilePage() {
                     className="group relative aspect-square bg-zinc-100 overflow-hidden"
                   >
                     {p.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
+                       
                       <img
                         src={p.imageUrl}
                         alt={p.title}
@@ -493,7 +492,7 @@ export default function PublicProfilePage() {
                           <Link href={`/channel/${c.id}`} className="flex items-center gap-3 flex-1 min-w-0">
                             <div className="h-12 w-12 rounded-xl overflow-hidden bg-gradient-to-br from-amber-100 to-orange-100 shrink-0">
                               {c.coverImageUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
+                                 
                                 <img src={c.coverImageUrl} alt="" className="h-full w-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                               ) : (
                                 <div className="flex h-full w-full items-center justify-center text-lg">👥</div>
@@ -539,7 +538,7 @@ export default function PublicProfilePage() {
                             <Link href={`/channel/${c.id}`} className="flex items-center gap-3 flex-1 min-w-0">
                               <div className="h-12 w-12 rounded-xl overflow-hidden bg-gradient-to-br from-amber-100 to-orange-100 shrink-0">
                                 {c.coverImageUrl ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
+                                   
                                   <img src={c.coverImageUrl} alt="" className="h-full w-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                                 ) : (
                                   <div className="flex h-full w-full items-center justify-center text-lg">👥</div>
@@ -600,7 +599,7 @@ export default function PublicProfilePage() {
                     })}
                   </p>
                 </div>
-                {(profile.role === "seller" || profile.role === "admin") && (
+                {stats.totalSales > 0 && (
                   <div>
                     <p className="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-1">Total Sales</p>
                     <p className="text-zinc-900">{stats.totalSales}</p>
@@ -634,7 +633,7 @@ export default function PublicProfilePage() {
           onClose={() => setFollowModal(null)}
           profileId={profileId}
           type={followModal}
-          onFollowToggle={(userId, isFollowing) => {
+          onFollowToggle={() => {
             // Update stats if someone follows/unfollows from the modal
           }}
         />

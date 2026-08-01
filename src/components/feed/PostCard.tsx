@@ -8,6 +8,8 @@ type Post = {
   id: string;
   content: string;
   imageUrl: string | null;
+  attachmentUrl?: string | null;
+  attachmentType?: string | null;
   createdAt: string;
   author: { id: string; name: string; avatar: string | null; bio: string | null };
   liked: boolean;
@@ -130,7 +132,7 @@ export function PostCard({
           >
             <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-amber-100 to-orange-100 text-lg font-bold text-amber-800 shadow-sm ring-2 ring-transparent group-hover:ring-amber-200 transition-all">
               {post.author.avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
+                 
                 <img src={post.author.avatar} alt="" className="h-full w-full object-cover transition-transform group-hover:scale-105" crossOrigin="anonymous" referrerPolicy="no-referrer" />
               ) : (
                 post.author.name.charAt(0)
@@ -155,10 +157,23 @@ export function PostCard({
             </div>
             <span className="text-sm text-zinc-400">{timeAgo(post.createdAt)}</span>
           </div>
-          <p className="mt-2 whitespace-pre-wrap text-zinc-700">{post.content}</p>
+          {post.content && (
+            <p className="mt-2 whitespace-pre-wrap text-zinc-700">{post.content}</p>
+          )}
+          {post.attachmentUrl && post.attachmentType?.startsWith("video") && (
+            <div className="mt-3 overflow-hidden rounded-lg bg-black">
+              <video
+                src={post.attachmentUrl}
+                controls
+                playsInline
+                preload="metadata"
+                className="max-h-[600px] w-full"
+              />
+            </div>
+          )}
           {post.imageUrl && (
             <div className="relative mt-3 aspect-video w-full overflow-hidden rounded-lg bg-zinc-100">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              { }
               <img 
                 src={post.imageUrl} 
                 alt="" 

@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 
@@ -50,7 +49,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(() => {
-    if (!user || !["admin", "seller", "buyer", "user"].includes(user.role)) return;
+    if (!user) return;
     Promise.all([
       fetch("/api/my-products").then((r) => r.json()),
       fetch(`/api/channels?ownerId=${user.id}`).then((r) => r.json()),
@@ -70,10 +69,6 @@ export default function DashboardPage() {
         router.push("/login");
         return;
       }
-      if (!["admin", "seller", "buyer", "user"].includes(user.role)) {
-        router.push("/products");
-        return;
-      }
     }
     if (user) {
       fetchData();
@@ -82,7 +77,7 @@ export default function DashboardPage() {
 
   // Poll for live notifications every 15 seconds
   useEffect(() => {
-    if (!user || (user.role !== "seller" && user.role !== "admin")) return;
+    if (!user) return;
     const interval = setInterval(fetchData, 15000);
     return () => clearInterval(interval);
   }, [user, fetchData]);
@@ -108,6 +103,17 @@ export default function DashboardPage() {
     try {
       await fetch(`/api/products/${id}`, { method: "DELETE" });
       setProducts((prev) => prev.filter((p) => p.id !== id));
+      fetchData();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function deleteChannel(id: string) {
+    if (!confirm("Delete this community? This cannot be undone.")) return;
+    try {
+      await fetch(`/api/channels/${id}`, { method: "DELETE" });
+      setChannels((prev) => prev.filter((c) => c.id !== id));
       fetchData();
     } catch (e) {
       console.error(e);
@@ -279,6 +285,9 @@ export default function DashboardPage() {
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
+                            <button onClick={() => deleteChannel(channel.id)} className="rounded-lg bg-rose-100 px-3 py-1.5 text-sm font-medium text-rose-700 hover:bg-rose-200">
+                              Delete
+                            </button>
                             <Link href={`/business/home?type=community&id=${channel.id}`} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 transition shadow-sm">
                               Dashboard
                             </Link>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { parsePrice } from "@/lib/money";
 
 export async function GET(
   _request: Request,
@@ -38,7 +39,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
-  if (!session || (session.role !== "seller" && session.role !== "admin")) {
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -55,18 +56,28 @@ export async function PATCH(
 
   try {
     const body = await request.json();
+
+    let price = product.price;
+    if (body.price != null) {
+      const parsedPrice = parsePrice(body.price);
+      if (parsedPrice === null) {
+        return NextResponse.json({ error: "Price must be a non-negative number" }, { status: 400 });
+      }
+      price = parsedPrice;
+    }
+
     const updated = await prisma.product.update({
       where: { id },
       data: {
         title: body.title ?? product.title,
         description: body.description ?? product.description,
-        price: body.price != null ? parseFloat(body.price) : product.price,
+        price,
         type: body.type ?? product.type,
         imageUrl: body.imageUrl ?? product.imageUrl,
         fileUrl: body.fileUrl ?? product.fileUrl,
-        audioUrl: body.audioUrl ?? (product as any).audioUrl, // Typecasting here safely maps to prisma schema natively generated afterwards
+        audioUrl: body.audioUrl ?? product.audioUrl,
         duration: body.duration ?? product.duration,
-        pages: body.pages != null ? parseInt(body.pages) : product.pages,
+        pages: body.pages != null ? parseInt(body.pages, 10) || null : product.pages,
         published: body.published ?? product.published,
       },
     });
@@ -86,7 +97,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
-  if (!session || (session.role !== "seller" && session.role !== "admin")) {
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

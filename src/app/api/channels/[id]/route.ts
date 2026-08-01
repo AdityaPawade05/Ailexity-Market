@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { parsePrice } from "@/lib/money";
 
 export async function GET(
   _request: Request,
@@ -52,23 +53,9 @@ export async function GET(
     select: { id: true },
   });
 
-  // Fetch price directly from DB in case Prisma Client is outdated
-  let actualPrice = 0;
-  try {
-    if ('price' in channel) {
-      actualPrice = (channel as any).price || 0;
-    } else {
-      const rawData: any[] = await prisma.$queryRawUnsafe(`SELECT price FROM "Channel" WHERE id = ?`, id);
-      if (rawData && rawData.length > 0) {
-        actualPrice = rawData[0].price || 0;
-      }
-    }
-  } catch(e) {}
-
   return NextResponse.json({
     channel: {
       ...channel,
-      price: actualPrice,
       followersCount,
       postsCount,
       members: members.map((item) => item.follower),
@@ -111,7 +98,7 @@ export async function PATCH(
     }
 
     const payload = await request.json();
-    const updateData: Record<string, any> = {};
+    const updateData: Record<string, string | number | null> = {};
 
     if (payload.name !== undefined) {
       const trimmedName = String(payload.name).trim();
@@ -138,61 +125,24 @@ export async function PATCH(
     }
 
     if (payload.price !== undefined) {
-      updateData.price = parseFloat(payload.price as string) || 0;
+      const parsedPrice = parsePrice(payload.price);
+      if (parsedPrice === null) {
+        return NextResponse.json({ error: "Price must be a non-negative number" }, { status: 400 });
+      }
+      updateData.price = parsedPrice;
     }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
-    let updatedChannel;
-    try {
-      updatedChannel = await prisma.channel.update({
-        where: { id },
-        data: updateData,
-        include: {
-          owner: { select: { id: true, name: true, avatar: true } },
-        },
-      });
-    } catch (e: any) {
-      if (e.message?.includes('Unknown argument')) {
-        // Fallback for Windows Prisma EPERM Node-locks
-        const setClauses: string[] = [];
-        const values: any[] = [];
-        for (const [key, value] of Object.entries(updateData)) {
-          setClauses.push(`"${key}" = ?`);
-          values.push(value !== undefined ? value : null);
-        }
-        setClauses.push(`"updatedAt" = CURRENT_TIMESTAMP`);
-        values.push(id);
-        
-        await prisma.$executeRawUnsafe(
-          `UPDATE "Channel" SET ${setClauses.join(", ")} WHERE "id" = ?`,
-          ...values
-        );
-        
-        updatedChannel = await prisma.channel.findUnique({
-          where: { id },
-          include: { owner: { select: { id: true, name: true, avatar: true } } }
-        });
-      } else {
-        throw e;
-      }
-    }
-
-    // Ensure price is injected for outdated clients
-    if (updatedChannel && !('price' in updatedChannel)) {
-      try {
-        if (updateData.price !== undefined) {
-          (updatedChannel as any).price = updateData.price;
-        } else {
-          const rawData: any[] = await prisma.$queryRawUnsafe(`SELECT price FROM "Channel" WHERE id = ?`, id);
-          if (rawData && rawData.length > 0) {
-            (updatedChannel as any).price = rawData[0].price || 0;
-          }
-        }
-      } catch (e) {}
-    }
+    const updatedChannel = await prisma.channel.update({
+      where: { id },
+      data: updateData,
+      include: {
+        owner: { select: { id: true, name: true, avatar: true } },
+      },
+    });
 
     return NextResponse.json(updatedChannel);
   } catch (error) {

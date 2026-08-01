@@ -8,22 +8,36 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const [usersCount, productsCount, purchasesCount, totalRevenue] = await Promise.all([
-    prisma.user.count(),
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const [
+    usersCount,
+    newUsersThisWeek,
+    productsCount,
+    publishedProductsCount,
+    purchasesCount,
+    totalRevenue,
+    postsCount,
+    channelsCount,
+  ] = await Promise.all([
+    prisma.user.count({ where: { role: { not: "admin" } } }),
+    prisma.user.count({ where: { role: { not: "admin" }, createdAt: { gte: weekAgo } } }),
     prisma.product.count(),
+    prisma.product.count({ where: { published: true } }),
     prisma.purchase.count(),
     prisma.purchase.aggregate({ _sum: { amount: true } }),
+    prisma.post.count(),
+    prisma.channel.count(),
   ]);
-
-  const buyersCount = await prisma.user.count({ where: { role: "buyer" } });
-  const sellersCount = await prisma.user.count({ where: { role: "seller" } });
 
   return NextResponse.json({
     usersCount,
+    newUsersThisWeek,
     productsCount,
+    publishedProductsCount,
     purchasesCount,
     totalRevenue: totalRevenue._sum.amount ?? 0,
-    buyersCount,
-    sellersCount,
+    postsCount,
+    channelsCount,
   });
 }

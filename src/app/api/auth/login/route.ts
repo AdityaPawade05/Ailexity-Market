@@ -13,7 +13,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email: String(email).trim().toLowerCase() },
+    });
     if (!user) {
       return NextResponse.json(
         { error: "Invalid email or password" },
@@ -26,6 +28,20 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Invalid email or password" },
         { status: 401 }
+      );
+    }
+
+    if (user.banned) {
+      return NextResponse.json(
+        { error: "Your account has been suspended. Contact support if you think this is a mistake." },
+        { status: 403 }
+      );
+    }
+
+    if (!user.emailVerified) {
+      return NextResponse.json(
+        { error: "Please verify your email before logging in.", needsVerification: true, email: user.email },
+        { status: 403 }
       );
     }
 

@@ -13,6 +13,24 @@ export async function GET(
 
   const { id } = await params;
 
+  const channel = await prisma.channel.findUnique({
+    where: { id },
+    select: { ownerId: true, price: true },
+  });
+  if (!channel) {
+    return NextResponse.json({ error: "Channel not found" }, { status: 404 });
+  }
+
+  // Paid channels are members-only — don't leak posts to non-members.
+  if (channel.price > 0 && channel.ownerId !== session.userId) {
+    const isFollowing = await prisma.channelFollow.findUnique({
+      where: { followerId_channelId: { followerId: session.userId, channelId: id } },
+    });
+    if (!isFollowing) {
+      return NextResponse.json({ error: "You must join this community to view posts" }, { status: 403 });
+    }
+  }
+
   const posts = await prisma.post.findMany({
     where: { channelId: id },
     include: {
